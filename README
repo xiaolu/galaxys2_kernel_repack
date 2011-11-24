@@ -1,7 +1,19 @@
-./unpack.sh zImagesm189 sm189
+Unpack zImage,Example:
+	./unpack.sh zImagesm189 sm189
 
-./gen_initramfs.sh -o sm189.cpio -u 0 -g 0 ./sm189
+Generate a cpio packed initramfs,Example:
+	./gen_initramfs.sh -o sm189.cpio -u 0 -g 0 ./sm189
 
-./repack zImagesm189 sm189.cpio zImage
+Original zImage($1) contains "sy" auto use siyah source code,Example:
+	./repack.sh zImagesy22rc2 sy22rc2.cpio zImage
 
+Original zImage($1) contains "vd" auto use void source code,Example:
+	./repack.sh zImagevdc vdc.cpio zImage
+
+Padding sufile to zImage offset=7000000,Example:
+	./repack.sh zImagesm189 sm189.cpio zImage su
+
+	how to use sufile:
+	dd if=/dev/block/mmcblk0p5 of=/system/app/Superuser.apk skip=7026336 seek=0 bs=1 count=196640
+	dd if=/dev/block/mmcblk0p5 of=/system/bin/su skip=7000000 seek=0 bs=1 count=26336
 
