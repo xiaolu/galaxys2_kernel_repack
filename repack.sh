@@ -325,7 +325,7 @@ new_zImage_name="new_zImage"
 rm ../$new_zImage_name 2>/dev/null >/dev/null
 printhl "Padding new zImage to 8388608 bytes"
 dd if=arch/arm/boot/zImage of=../$new_zImage_name bs=8388608 conv=sync 2>/dev/null >/dev/null
-if [ $4 = "su" ]; then
+if [ $4-u = "su-u" ]; then
 	printhl "Padding sufiles to $new_zImage_name"
 	dd if=sufile.pad of=../$new_zImage_name bs=1 count=222976 seek=7000000 conv=notrunc 2>/dev/null >/dev/null
 fi
