@@ -1,0 +1,4 @@
+./unpack.sh zImagesm189 sm189
+./gen_initramfs.sh -o sm189.cpio -u 0 -g 0 ./sm189
+./repack zImagesm189 sm189.cpio zImage
+
