@@ -252,6 +252,26 @@ cd resources_tmp
 cp ../out/new_Image arch/arm/boot/Image
 cp -f include/generated/autoconf.$compress_type.h include/generated/autoconf.h 2>/dev/null >/dev/null
 
+if [[ "${1/sy/}" != "$1" ]]; then
+	#for Siyah
+	printhl "Prepare source code for Siyah"
+	cp -f include/linux/kernel.siyah.h include/linux/kernel.h
+	cp -f include/asm-generic/bug.siyah.h include/asm-generic/bug.h
+	cp -f include/generated/autoconf.siyah.h include/generated/autoconf.h
+elif [[ "${1/vd/}" != "$1" ]]; then
+	#for Void
+	printhl "Prepare source code for Void"
+	cp -f include/linux/kernel.void.h include/linux/kernel.h
+	cp -f arch/arm/include/asm/ptrace.void.h arch/arm/include/asm/ptrace.h
+	cp -f include/generated/autoconf.void.h include/generated/autoconf.h
+elif [[ "${1/meda/}" != "$1" ]]; then
+	#for Androidmeda
+	printhl "Prepare source code for Androidmeda"
+	cp -f include/asm-generic/bug.siyah.h include/asm-generic/bug.h
+	cp -f arch/arm/include/asm/assembler.meda.h arch/arm/include/asm/assembler.h
+	cp -f include/generated/autoconf.meda.h include/generated/autoconf.h
+fi
+
 #1. Image -> piggy.*
 printhl "Image ---> piggy.$compress_type"
 llsl=""
@@ -266,20 +286,7 @@ elif [ $compress_type = "xz" ]; then
 
 	(cat arch/arm/boot/Image | xz --check=crc32 --arm --lzma2=,dict=32MiB &&		\
 	printf $(size_append arch/arm/boot/Image)) > arch/arm/boot/compressed/piggy.xzkern
-	
-	if [[ "${1/sy/}" != "$1" ]]; then
-		#for Siyah
-		printerr "Siyah"
-		cp -f include/linux/kernel.siyah.h include/linux/kernel.h
-		cp -f include/asm-generic/bug.siyah.h include/asm-generic/bug.h
-		cp -f include/generated/autoconf.siyah.h include/generated/autoconf.h
-	elif [[ "${1/vd/}" != "$1" ]]; then
-		#for Void
-		printerr "Void"
-		cp -f include/linux/kernel.void.h include/linux/kernel.h
-		cp -f arch/arm/include/asm/ptrace.void.h arch/arm/include/asm/ptrace.h
-		cp -f include/generated/autoconf.void.h include/generated/autoconf.h
-	fi	
+
 	printhl "Compiling ashldi3.o"
 	$COMPILER-gcc -Wp,-MD,arch/arm/boot/compressed/.ashldi3.o.d  -nostdinc -isystem $COMPILER_LIB/include -Iarch/arm/include -Iinclude  -include include/generated/autoconf.h -D__KERNEL__ -mlittle-endian -Iarch/arm/mach-s5pv310/include -Iarch/arm/plat-s5p/include -Iarch/arm/plat-samsung/include -D__ASSEMBLY__ -mabi=aapcs-linux -mno-thumb-interwork -funwind-tables  -D__LINUX_ARM_ARCH__=7 -march=armv7-a  -include asm/unified.h -msoft-float -gdwarf-2     -Wa,-march=all   -c -o arch/arm/boot/compressed/ashldi3.o arch/arm/lib/ashldi3.S
 
