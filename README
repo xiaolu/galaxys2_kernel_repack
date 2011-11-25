@@ -9,11 +9,14 @@ Unpack zImage,Example:
 Generate a cpio packed initramfs,Example:
 	./gen_initramfs.sh -o sm189.cpio -u 0 -g 0 ./sm189
 
-Original zImage($1) contains "sy" auto use siyah source code,Example:
+Original zImage file name contains "sy" auto use siyah source code,Example:
 	./repack.sh zImagesy22rc2 sy22rc2.cpio zImage
 
-Original zImage($1) contains "vd" auto use void source code,Example:
+Original zImage file name contains "vd" auto use void source code,Example:
 	./repack.sh zImagevdc vdc.cpio zImage
+
+Original zImage file name contains "md" auto use Androidmeda source code,Example:
+	./repack.sh zImagemdtjk mdtjk.cpio zImage
 
 Padding sufile to zImage offset=7000000,Example:
 	./repack.sh zImagesm189 sm189.cpio zImage su

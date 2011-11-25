@@ -264,7 +264,7 @@ elif [[ "${1/vd/}" != "$1" ]]; then
 	cp -f include/linux/kernel.void.h include/linux/kernel.h
 	cp -f arch/arm/include/asm/ptrace.void.h arch/arm/include/asm/ptrace.h
 	cp -f include/generated/autoconf.void.h include/generated/autoconf.h
-elif [[ "${1/meda/}" != "$1" ]]; then
+elif [[ "${1/md/}" != "$1" ]]; then
 	#for Androidmeda
 	printhl "Prepare source code for Androidmeda"
 	cp -f include/asm-generic/bug.siyah.h include/asm-generic/bug.h
