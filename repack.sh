@@ -1,10 +1,10 @@
 #!/bin/bash
 ##############################################################################
 # you should point where your cross-compiler is         
-COMPILER=/home/xiaolu/bin/android-toolchain-eabi/bin/arm-eabi
-COMPILER_LIB=/home/xiaolu/bin/android-toolchain-eabi/lib/gcc/arm-eabi/4.5.4
-#COMPILER=/home/xiaolu/CodeSourcery/Sourcery_G++_Lite/bin/arm-none-eabi
-#COMPILER_LIB=/home/xiaolu/CodeSourcery/Sourcery_G++_Lite/lib/gcc/arm-none-eabi/4.5.2
+#COMPILER=/home/xiaolu/bin/android-toolchain-eabi/bin/arm-eabi
+#COMPILER_LIB=/home/xiaolu/bin/android-toolchain-eabi/lib/gcc/arm-eabi/4.5.4
+COMPILER=/home/xiaolu/CodeSourcery/Sourcery_G++_Lite/bin/arm-none-eabi
+COMPILER_LIB=/home/xiaolu/CodeSourcery/Sourcery_G++_Lite/lib/gcc/arm-none-eabi/4.5.2
 ##############################################################################
 #set -x
 
@@ -22,7 +22,7 @@ tail_image="./out/tail.image"
 ramdisk_image="./out/ramdisk.image"
 workdir=`pwd`
 
-C_H1="\033[1;32m" # highlight text 1
+C_H1="\033[1;32m"
 C_ERR="\033[1;31m"
 C_CLEAR="\033[1;0m"
 
@@ -263,16 +263,21 @@ KBUILD_CFLAGS="-Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
 		   -fno-delete-null-pointer-checks"
 CFLAGS_ABI="-mabi=aapcs-linux -mno-thumb-interwork -funwind-tables -D__LINUX_ARM_ARCH__=7 -march=armv7-a"
 
+C_H1="\033[1;36m"
 if [[ "${1/sy/}" != "$1" ]]; then
 	#for Siyah
-	CFLAGS_KERNEL="-fsched-spec-load -funswitch-loops -fpredictive-commoning \
-			-fgcse-after-reload -ftree-vectorize -fipa-cp-clone \
-			-ffast-math -fsingle-precision-constant -pipe \
-			-mtune=cortex-a9 -mfpu=neon -march=armv7-a"
+	SIYAH_FLAGS="-fsched-spec-load -floop-interchange -floop-strip-mine -floop-block \
+		-funswitch-loops -fpredictive-commoning -fgcse-after-reload -fno-tree-vectorize \
+		-fipa-cp-clone -marm -mtune=cortex-a9 -march=armv7-a -pipe"
+	KBUILD_CFLAGS="$KBUILD_CFLAGS $SIYAH_FLAGS"
 	printhl "Prepare source code for 【Siyah】"
 	cp -f include/linux/kernel.siyah.h include/linux/kernel.h
+	cp -f include/linux/compiler.siyah.h include/linux/compiler.h
+	cp -f include/linux/compiler-gcc.siyah.h include/linux/compiler-gcc.h
+	cp -f include/linux/compiler-gcc4.siyah.h include/linux/compiler-gcc4.h
 	cp -f include/asm-generic/bug.siyah.h include/asm-generic/bug.h
 	cp -f include/generated/autoconf.siyah.h include/generated/autoconf.h
+	cp -f include/generated/utsrelease.siyah.h include/generated/utsrelease.h
 elif [[ "${1/vd/}" != "$1" ]]; then
 	#for Void
 	KBUILD_CFLAGS="$KBUILD_CFLAGS -marm -march=armv7-a -mtune=cortex-a9 \
@@ -303,6 +308,11 @@ elif [[ "${1/md/}" != "$1" ]]; then
 	cp -f arch/arm/include/asm/assembler.meda.h arch/arm/include/asm/assembler.h
 	cp -f include/generated/autoconf.meda.h include/generated/autoconf.h
 fi
+C_H1="\033[1;32m"
+
+#for Sourcery_G++_Lite
+[ "${COMPILER_LIB/Sourcery/}" != "$COMPILER_LIB" ] && KBUILD_CFLAGS="$KBUILD_CFLAGS -mno-unaligned-access"
+#echo $KBUILD_CFLAGS
 
 #1. Image -> piggy.*
 printhl "Image ---> piggy.$compress_type"
