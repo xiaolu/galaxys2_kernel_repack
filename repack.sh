@@ -1,10 +1,10 @@
 #!/bin/bash
 ##############################################################################
 # you should point where your cross-compiler is         
-#COMPILER=/home/xiaolu/bin/android-toolchain-eabi/bin/arm-eabi
-#COMPILER_LIB=/home/xiaolu/bin/android-toolchain-eabi/lib/gcc/arm-eabi/4.5.4
-COMPILER=/home/xiaolu/CodeSourcery/Sourcery_G++_Lite/bin/arm-none-eabi
-COMPILER_LIB=/home/xiaolu/CodeSourcery/Sourcery_G++_Lite/lib/gcc/arm-none-eabi/4.5.2
+COMPILER=/home/xiaolu/bin/android-toolchain-eabi/bin/arm-eabi
+COMPILER_LIB=/home/xiaolu/bin/android-toolchain-eabi/lib/gcc/arm-eabi/4.5.4
+#COMPILER=/home/xiaolu/CodeSourcery/Sourcery_G++_Lite/bin/arm-none-eabi
+#COMPILER_LIB=/home/xiaolu/CodeSourcery/Sourcery_G++_Lite/lib/gcc/arm-none-eabi/4.5.2
 ##############################################################################
 #set -x
 
@@ -50,14 +50,20 @@ EOF
 # find start/end of initramfs in the zImage file
 find_start_end() 
 {
-	pos1=`grep -P -a -b -m 1 --only-matching '\x1F\x8B\x08' $zImage | cut -f 1 -d :`
-	pos2=`grep -P -a -b -m 1 --only-matching '\x{5D}\x{00}\x..\x{FF}\x{FF}\x{FF}\x{FF}\x{FF}\x{FF}' $zImage | cut -f 1 -d :`
-	pos3=`grep -P -a -b -m 1 --only-matching '\xFD\x37\x7A\x58\x5A' $zImage | cut -f 1 -d : | tail -1`
+	pos1=`grep -P -a -b -m 1 --only-matching '\x1F\x8B\x08' $zImage | \
+		cut -f 1 -d : | awk '(int($0)<50000){print $0;exit}'`
+	pos2=`grep -P -a -b -m 1 --only-matching '\x{5D}\x{00}\x..\x{FF}\x{FF}\x{FF}\x{FF}\x{FF}\x{FF}' \
+		$zImage | cut -f 1 -d : | awk '(int($0)<50000){print $0;exit}'`
+	pos3=`grep -P -a -b -m 1 --only-matching '\xFD\x37\x7A\x58\x5A' $zImage | \
+		cut -f 1 -d : | tail -1 | awk '(int($0)<50000){print $0;exit}'`
+	pos4=`grep -P -a -b --only-matching '\211\114\132' $zImage | \
+		head -2 |tail -1|cut -f 1 -d : | awk '(int($0)<50000){print $0;exit}'`
 	zImagesize=$(stat -c "%s" $zImage)
 	[ -z $pos1 ] && pos1=$zImagesize
 	[ -z $pos2 ] && pos2=$zImagesize
 	[ -z $pos3 ] && pos3=$zImagesize
-	minpos=`echo -e "$pos1\n$pos2\n$pos3" | sort -n | head -1`
+	[ -z $pos4 ] && pos4=$zImagesize
+	minpos=`echo -e "$pos1\n$pos2\n$pos3\n$pos4" | sort -n | head -1`
 	mkdir out 2>/dev/null
 	if [ $minpos -eq $zImagesize ]; then
 		printerr "not found kernel from $zImage!"
@@ -76,11 +82,16 @@ find_start_end()
 		printhl "Extracting xz'd kernel from $zImage (start = $pos3)"
     		dd status=noxfer if=$zImage bs=$pos3 skip=1 2>/dev/null | unxz -qf > $kernel 2>/dev/null
 		compress_type="xz"
+	elif [ $minpos -eq $pos4 ]; then
+		printhl "Extracting lzo'd kernel from $zImage (start = $pos4)"
+		dd if=$zImage of="$kernel.lzo" bs=$pos4 skip=1 2>/dev/null >/dev/null
+		lzop -d "$kernel.lzo" 2>/dev/null >/dev/null
+		compress_type="lzo"
 	fi	
 	#========================================================
 	# Determine cpio compression type:
 	#========================================================
-	for x in none gzip bzip lzma; do
+	for x in none gzip bzip lzma lzop; do
 		case $x in
 			bzip)
                 		csig='\x{31}\x{41}\x{59}\x{26}\x{53}\x{59}'
@@ -100,6 +111,12 @@ find_start_end()
                 		fext='.lzma'
                 		;;
 
+            		lzop)
+                		csig='\211\114\132'
+				ucmd='lzop -d'
+                		fext='.lzo'
+                		;;
+
             		none)
                 		csig='070701'
                 		ucmd=
@@ -110,9 +127,8 @@ find_start_end()
         	#========================================================================
         	# Search for compressed cpio archive
         	#========================================================================
-        	search=`grep -P -a -b -m 1 --only-matching $csig $kernel | cut -f 1 -d : | head -1`
+        	search=$(grep -P -a -b -m 1 -o $csig $kernel | cut -f 1 -d : | head -1)
         	pos=${search:-0}
-
 		if [ ${pos} -gt 0 ]; then
 			if [ ${pos} -le ${cpio_compressed_start:-0} ] || [ -z $cpio_compressed_start ];then
 				cpio_compressed_start=$pos
@@ -148,6 +164,7 @@ find_start_end()
 		end=$((end1 + end2))
 		end=$((end - end%16))
 		cpio_compress_type=$compress_type
+		[ $compress_type = "lzo" ] && cpio_compress_type="lzop"
 	fi
 }
 
@@ -306,7 +323,7 @@ elif [[ "${1/md/}" != "$1" ]]; then
 	printhl "Prepare source code for 【Androidmeda】"
 	cp -f include/asm-generic/bug.siyah.h include/asm-generic/bug.h
 	cp -f arch/arm/include/asm/assembler.meda.h arch/arm/include/asm/assembler.h
-	cp -f include/generated/autoconf.meda.h include/generated/autoconf.h
+	#cp -f include/generated/autoconf.meda.h include/generated/autoconf.h
 fi
 C_H1="\033[1;32m"
 
@@ -333,7 +350,9 @@ elif [ $compress_type = "xz" ]; then
 	$COMPILER-gcc -Wp,-MD,arch/arm/boot/compressed/.ashldi3.o.d  $NOSTDINC_FLAGS \
 	-D__ASSEMBLY__ $CFLAGS_ABI  -include asm/unified.h -msoft-float -gdwarf-2     \
 	-Wa,-march=all   -c -o arch/arm/boot/compressed/ashldi3.o arch/arm/lib/ashldi3.S
-
+elif [ $compress_type = "lzo" ]; then
+	(cat arch/arm/boot/Image | lzop -9 && printf $(size_append arch/arm/boot/Image)) \
+	> arch/arm/boot/compressed/piggy.lzo
 fi
 
 #2. piggy.* -> piggy.*.o
