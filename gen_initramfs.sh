@@ -299,5 +299,6 @@ if [ ! -z ${output_file} ]; then
 		|| (rm -f ${output_file} ; false)
 	fi
 	[ -z ${cpio_file} ] && rm ${cpio_tfile}
+	echo $output_file filesize: $(stat -c "%s" $output_file)
 fi
 exit 0
