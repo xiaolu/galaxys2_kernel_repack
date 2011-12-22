@@ -180,6 +180,16 @@ function size_append()
 	}
 }
 
+function count512()
+{
+	fsize=$(stat -c "%s" $1);
+	if [ $((fsize%512)) -ne 0 ]; then
+		fsize=$((fsize/512+1))
+	else
+		fsize=$((fsize/512))
+	fi
+ 	printf $fsize
+}
 ###############################################################################
 #
 # code begins
@@ -263,6 +273,7 @@ fi
 # rebuild zImage
 #============================================
 printhl "Now we are rebuilding the zImage"
+rm -r resources_tmp 2>/dev/null >/dev/null
 mkdir resources_tmp
 cp -rn $RESOURCES/* ./resources_tmp/
 cd resources_tmp
@@ -389,16 +400,35 @@ $COMPILER-objcopy -O binary -R .note -R .note.gnu.build-id -R .comment -S  arch/
 
 # finishing
 newzImagesize=$(stat -c "%s" arch/arm/boot/zImage)
-printhl "New zImage size:$newzImagesize"
+printhl "Compiled new zImage size:$newzImagesize"
+
 new_zImage_name="new_zImage"
 [ -z $3 ] || new_zImage_name=$3
 rm ../$new_zImage_name 2>/dev/null >/dev/null
-printhl "Padding new zImage to 8388608 bytes"
-dd if=arch/arm/boot/zImage of=../$new_zImage_name bs=8388608 conv=sync 2>/dev/null >/dev/null
-if [ $4-u = "su-u" ]; then
+if [ $4-u = "payload-u" ]; then
+	printhl "Padding payload files to $new_zImage_name"
+	boot_offset=$(count512 arch/arm/boot/zImage)
+	dd if=arch/arm/boot/zImage of=zImage512 bs=512 count=$boot_offset conv=sync 2>/dev/null >/dev/null
+	boot_offset=$((boot_offset+1))
+	boot_len=$(count512 boot.tar.gz)
+	recovery_offset=$((boot_offset+boot_len))
+	recovery_len=$(count512 recovery.tar.gz)
+	printf "\n\nBOOT_IMAGE_OFFSETS\n" > BOOT_IMAGE_OFFSETS
+	printf "boot_offset=$boot_offset;boot_len=$boot_len;recovery_offset=$recovery_offset;recovery_len=$recovery_len;\n\n" >> BOOT_IMAGE_OFFSETS
+	dd if=BOOT_IMAGE_OFFSETS of=BOOT_IMAGE_OFFSETS_512 bs=512 conv=sync 2>/dev/null >/dev/null
+	dd if=boot.tar.gz of=boot512 bs=512 count=$boot_len conv=sync 2>/dev/null >/dev/null
+	dd if=recovery.tar.gz of=recovery512 bs=512 count=$recovery_len conv=sync 2>/dev/null >/dev/null
+	cat zImage512 BOOT_IMAGE_OFFSETS_512 boot512 recovery512 > new_zImage
+	newzImagesize=$(stat -c "%s" new_zImage)
+	printhl "Now zImage size:$newzImagesize"
+	printhl "Padding new zImage to 8388608 bytes"
+	dd if=new_zImage of=../$new_zImage_name bs=8388608 conv=sync 2>/dev/null >/dev/null
+elif [ $4-u = "su-u" ]; then
 	printhl "Padding sufiles to $new_zImage_name"
-	dd if=sufile.pad of=../$new_zImage_name bs=1 count=222976 seek=7000000 conv=notrunc 2>/dev/null >/dev/null
+	dd if=arch/arm/boot/zImage of=../$new_zImage_name bs=8388608 conv=sync 2>/dev/null >/dev/null
+	dd if=sufile.pad of=../$new_zImage_name bs=1 count=222976 seek=7000000 conv=notrunc 2>/dev/null >/dev/null	
 fi
+
 #cp -f arch/arm/boot/zImage ../$new_zImage_name
 printhl "$new_zImage_name has been created"
 printhl "Cleaning up..."
