@@ -1,0 +1,33 @@
+[mount]
+#device					type	mount_point	fs_type		image_name		tag			option
+boot					crital 	none		emmc		boot.bin		boot
+/dev/block/mmcblk0p1	crital	/efs		ext4		efs.img			efs
+/dev/block/mmcblk0p2	crital	none		emmc		sbl.bin			sbl1		/dev/block/mmcblk0p3
+/dev/block/mmcblk0p4	crital	/mnt/.lfs	j4fs		param.lfs		param
+/dev/block/mmcblk0p5	crital	none		emmc		zImage			kernel
+/dev/block/mmcblk0p7	crital	/cache		ext4		cache.img		cache
+/dev/block/mmcblk0p8	retry	none		emmc		modem.bin		modem
+/dev/block/mmcblk0p9	retry	/system		ext4		factoryfs.img	system
+/dev/block/mmcblk0p12	retry	/preload	ext4		hidden.img		preload
+/dev/block/mmcblk1		retry 	/sdcard1	vfat		sdcard.img		sdcard		/dev/block/mmcblk1p1
+
+[global]
+order=sbl1,param,kernel,system,modem,preload,cache
+#order=sbl1,param,cache
+retry=3
+watchdog_timeout = 180
+stream_command = chiper,tar
+
+[sbl1]
+buffer_size = 1M
+action_command = loke3
+
+[system]
+action_command = remount
+
+[cache]
+action_command = csc,remount
+
+[param]
+buffer_size = 1M
+action_command = param,remount

@@ -1,0 +1,17 @@
+#!/sbin/busybox8 sh
+if /sbin/busybox8 [ $# -lt 1 ];
+then
+  /system/bin/getprop
+  for i in $(/sbin/busybox8 ls -1 /customkernel/property/*); do
+    j=$(echo "$i" | cut -d "/" -f 4)
+    k=$(cat $i);
+    echo [$j]: [$k];
+  done;
+else
+  if /sbin/busybox8 [ -f /customkernel/property/$1 ];
+  then
+    cat /customkernel/property/$1
+  else
+    /system/bin/getprop "$@"
+  fi;
+fi;
