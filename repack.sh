@@ -292,7 +292,7 @@ KBUILD_CFLAGS="-Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
 CFLAGS_ABI="-mabi=aapcs-linux -mno-thumb-interwork -funwind-tables -D__LINUX_ARM_ARCH__=7 -march=armv7-a"
 
 C_H1="\033[1;36m"
-if [[ "${1/sy/}" != "$1" ]]; then
+if [[ "${1/sy/}" != "$1" ]] && [ $compress_type = "xz" ]; then
 	#for Siyah
 	SIYAH_FLAGS="-fsched-spec-load -floop-interchange -floop-strip-mine -floop-block \
 		-funswitch-loops -fpredictive-commoning -fgcse-after-reload -fno-tree-vectorize \
@@ -306,7 +306,7 @@ if [[ "${1/sy/}" != "$1" ]]; then
 	cp -f include/asm-generic/bug.siyah.h include/asm-generic/bug.h
 	cp -f include/generated/autoconf.siyah.h include/generated/autoconf.h
 	cp -f include/generated/utsrelease.siyah.h include/generated/utsrelease.h
-elif [[ "${1/vd/}" != "$1" ]]; then
+elif [[ "${1/vd/}" != "$1" ]] && [ $compress_type = "xz" ]; then
 	#for Void
 	KBUILD_CFLAGS="$KBUILD_CFLAGS -marm -march=armv7-a -mtune=cortex-a9 \
 			-mfpu=neon -mfloat-abi=softfp \
@@ -317,7 +317,7 @@ elif [[ "${1/vd/}" != "$1" ]]; then
 	cp -f include/linux/kernel.void.h include/linux/kernel.h
 	cp -f arch/arm/include/asm/ptrace.void.h arch/arm/include/asm/ptrace.h
 	cp -f include/generated/autoconf.void.h include/generated/autoconf.h
-elif [[ "${1/md/}" != "$1" ]]; then
+elif [[ "${1/md/}" != "$1" ]] && [ $compress_type = "gzip" ]; then
 	#for Androidmeda
 	CFLAGS_KERNEL="-finline-functions -funswitch-loops -fpredictive-commoning \
 			-fgcse-after-reload -ftree-vectorize -fipa-cp-clone \
