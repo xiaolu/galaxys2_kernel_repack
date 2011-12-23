@@ -410,17 +410,18 @@ if [ $4-u = "payload-u" ]; then
 	boot_offset=$(count512 arch/arm/boot/zImage)
 	dd if=arch/arm/boot/zImage of=zImage512 bs=512 count=$boot_offset conv=sync 2>/dev/null >/dev/null
 	boot_offset=$((boot_offset+1))
-	boot_len=$(count512 boot.tar.gz)
+	boot_len=$(count512 boot.tar.xz)
 	recovery_offset=$((boot_offset+boot_len))
-	recovery_len=$(count512 recovery.tar.gz)
+	recovery_len=$(count512 recovery.tar.xz)
 	printf "\n\nBOOT_IMAGE_OFFSETS\n" > BOOT_IMAGE_OFFSETS
 	printf "boot_offset=$boot_offset;boot_len=$boot_len;recovery_offset=$recovery_offset;recovery_len=$recovery_len;\n\n" >> BOOT_IMAGE_OFFSETS
 	dd if=BOOT_IMAGE_OFFSETS of=BOOT_IMAGE_OFFSETS_512 bs=512 conv=sync 2>/dev/null >/dev/null
-	dd if=boot.tar.gz of=boot512 bs=512 count=$boot_len conv=sync 2>/dev/null >/dev/null
-	dd if=recovery.tar.gz of=recovery512 bs=512 count=$recovery_len conv=sync 2>/dev/null >/dev/null
+	dd if=boot.tar.xz of=boot512 bs=512 count=$boot_len conv=sync 2>/dev/null >/dev/null
+	dd if=recovery.tar.xz of=recovery512 bs=512 count=$recovery_len conv=sync 2>/dev/null >/dev/null
 	cat zImage512 BOOT_IMAGE_OFFSETS_512 boot512 recovery512 > new_zImage
 	newzImagesize=$(stat -c "%s" new_zImage)
 	printhl "Now zImage size:$newzImagesize"
+	[ $newzImagesize -gt 8388608 ] && printerr "zImage too big..." && exit 1
 	printhl "Padding new zImage to 8388608 bytes"
 	dd if=new_zImage of=../$new_zImage_name bs=8388608 conv=sync 2>/dev/null >/dev/null
 elif [ $4-u = "su-u" ]; then

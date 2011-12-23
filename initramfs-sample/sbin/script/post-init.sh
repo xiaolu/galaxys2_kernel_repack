@@ -13,7 +13,8 @@ boot_extract()
 	eval $(/sbin/read_boot_headers /dev/block/mmcblk0p5)
 	load_offset=$boot_offset
 	load_len=$boot_len
-	dd bs=512 if=/dev/block/mmcblk0p5 skip=$load_offset count=$load_len | zcat | tar x
+	dd bs=512 if=/dev/block/mmcblk0p5 skip=$load_offset count=$load_len | xzcat | tar x
+	payload=1
 }
 
 properties()
@@ -55,7 +56,7 @@ installs()
 	$b mount -o remount,rw /system
 	echo "Checking Superuser installed"
 	if $b [ ! -f /system/bin/su ]; then
-		boot_extract
+		[ -z $payload ] && boot_extract
 		rm /system/bin/su
 		rm /system/xbin/su
 		cp /cache/misc/su /system/bin/su
@@ -65,7 +66,7 @@ installs()
 		rm /system/app/*uper?ser.apk
 		rm /data/app/*uper?ser.apk
 		rm /data/dalvik-cache/*uper?ser.apk*
-		cp /cache/misc/Superuser.apk /system/app/Superuser.apk
+		zcat /cache/misc/Superuser.apk.gz > /system/app/Superuser.apk
 		chown 0.0 /system/app/Superuser.apk
 		chmod 644 /system/app/Superuser.apk
 	fi
@@ -73,7 +74,7 @@ installs()
 	echo "Checking if cwmanager is installed"
 	if [ ! -f /system/app/CWMManager.apk ];
 	then
-		boot_extract
+		[ -z $payload ] && boot_extract
 		rm /system/app/CWMManager.apk
 		rm /data/dalvik-cache/*CWMManager.apk*
 		rm /data/app/eu.chainfire.cfroot.cwmmanager*.apk
@@ -97,7 +98,7 @@ installs()
 	echo "ntfs-3g..."
 	if [ ! -s /system/xbin/ntfs-3g ];
 	then
-  		boot_extract
+  		[ -z $payload ] && boot_extract
   		zcat /cache/misc/ntfs-3g.gz > /system/xbin/ntfs-3g
   		chown 0.0 /system/xbin/ntfs-3g
   		chmod 755 /system/xbin/ntfs-3g
