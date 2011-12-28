@@ -32,3 +32,5 @@ Use tar.fz In the end of the zImage:
 	load_offset=$boot_offset
 	load_len=$boot_len
 	dd bs=512 if=/dev/block/mmcblk0p5 skip=$load_offset count=$load_len | xzcat | tar x
+
+recovery.tar.xz and boot.tar.xz in resources directory，you can customize.
