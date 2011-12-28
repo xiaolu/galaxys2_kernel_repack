@@ -7,10 +7,10 @@ Unpack zImage,Example:
 	./unpack.sh zImagesm189 sm189
 
 Generate a cpio packed initramfs,Example:
-	./gen_initramfs.sh -o sm189.cpio -u 0 -g 0 ./sm189
+	./gen_initramfs.sh -o initramfs.cpio -u 0 -g 0 ./initramfs-sample
 
 Original zImage file name contains "sy" auto use siyah source code,Example:
-	./repack.sh zImagesy22rc2 sy22rc2.cpio zImage
+	./repack.sh zImagesy22rc2 initramfs.cpio zImage
 
 Original zImage file name contains "vd" auto use void source code,Example:
 	./repack.sh zImagevdc vdc.cpio zImage
@@ -25,12 +25,9 @@ Padding sufile to zImage offset=7000000,Example:
 	dd if=/dev/block/mmcblk0p5 of=/system/app/Superuser.apk skip=7026336 seek=0 bs=1 count=196640
 	dd if=/dev/block/mmcblk0p5 of=/system/bin/su skip=7000000 seek=0 bs=1 count=26336
 
-Use tar.fz In the end of the zImage:
-	./repack.sh zImagesy26 sy26.cpio zImage payload
+Use tar.xz In the end of the zImage:
+	./repack.sh zImagesy262 initramfs.cpio zImage payload
 
-	eval $(/sbin/read_boot_headers /dev/block/mmcblk0p5)
-	load_offset=$boot_offset
-	load_len=$boot_len
-	dd bs=512 if=/dev/block/mmcblk0p5 skip=$load_offset count=$load_len | xzcat | tar x
+	how to use,pls read initramfs-sample/sbin/script/post-init.sh & recovery.sh
 
 recovery.tar.xz and boot.tar.xz in resources directory，you can customize.
