@@ -280,68 +280,6 @@ cd resources_tmp
 cp ../out/new_Image arch/arm/boot/Image
 cp -f include/generated/autoconf.$compress_type.h include/generated/autoconf.h 2>/dev/null >/dev/null
 
-NOSTDINC_FLAGS="-nostdinc -isystem $COMPILER_LIB/include -Iarch/arm/include \
-		-Iinclude  -include include/generated/autoconf.h -D__KERNEL__ \
-		-mlittle-endian -Iarch/arm/mach-s5pv310/include \
-		-Iarch/arm/plat-s5p/include -Iarch/arm/plat-samsung/include"
-KBUILD_CFLAGS="-Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
-		   -fno-strict-aliasing -fno-common \
-		   -Werror-implicit-function-declaration \
-		   -Wno-format-security \
-		   -fno-delete-null-pointer-checks"
-CFLAGS_ABI="-mabi=aapcs-linux -mno-thumb-interwork -funwind-tables -D__LINUX_ARM_ARCH__=7 -march=armv7-a"
-
-C_H1="\033[1;36m"
-if [[ "${1/sy/}" != "$1" ]] && [ $compress_type = "xz" ]; then
-	#for Siyah
-	SIYAH_FLAGS="-fsched-spec-load -floop-interchange -floop-strip-mine -floop-block \
-		-funswitch-loops -fpredictive-commoning -fgcse-after-reload -fno-tree-vectorize \
-		-fipa-cp-clone -marm -mtune=cortex-a9 -march=armv7-a -pipe"
-	KBUILD_CFLAGS="$KBUILD_CFLAGS $SIYAH_FLAGS"
-	printhl "Prepare source code for 【Siyah】"
-	cp -f include/linux/kernel.siyah.h include/linux/kernel.h
-	cp -f include/linux/compiler.siyah.h include/linux/compiler.h
-	cp -f include/linux/compiler-gcc.siyah.h include/linux/compiler-gcc.h
-	cp -f include/linux/compiler-gcc4.siyah.h include/linux/compiler-gcc4.h
-	cp -f include/asm-generic/bug.siyah.h include/asm-generic/bug.h
-	cp -f include/generated/autoconf.siyah.h include/generated/autoconf.h
-	cp -f include/generated/utsrelease.siyah.h include/generated/utsrelease.h
-elif [[ "${1/vd/}" != "$1" ]] && [ $compress_type = "xz" ]; then
-	#for Void
-	KBUILD_CFLAGS="$KBUILD_CFLAGS -marm -march=armv7-a -mtune=cortex-a9 \
-			-mfpu=neon -mfloat-abi=softfp \
-			-fno-tree-vectorize \
-			-floop-interchange -floop-strip-mine -floop-block \
-			-pipe"
-	printhl "Prepare source code for 【Void】"
-	cp -f include/linux/kernel.void.h include/linux/kernel.h
-	cp -f arch/arm/include/asm/ptrace.void.h arch/arm/include/asm/ptrace.h
-	cp -f include/generated/autoconf.void.h include/generated/autoconf.h
-elif [[ "${1/md/}" != "$1" ]] && [ $compress_type = "gzip" ]; then
-	#for Androidmeda
-	CFLAGS_KERNEL="-finline-functions -funswitch-loops -fpredictive-commoning \
-			-fgcse-after-reload -ftree-vectorize -fipa-cp-clone \
-			-ffast-math -fsingle-precision-constant -pipe -mtune=cortex-a9 \
-			-mfpu=neon -march=armv7-a"
-	KBUILD_CFLAGS="$KBUILD_CFLAGS -mfloat-abi=softfp -funroll-loops \
-                	-floop-interchange -floop-strip-mine -floop-block \
-                	-fpredictive-commoning -ftree-vectorize \
-                	-funswitch-loops -fgcse-after-reload -fipa-cp-clone \
-                	-pipe \
-                	-marm -march=armv7-a -mtune=cortex-a9 \
-                	-mfpu=neon"
-
-	printhl "Prepare source code for 【Androidmeda】"
-	cp -f include/asm-generic/bug.siyah.h include/asm-generic/bug.h
-	cp -f arch/arm/include/asm/assembler.meda.h arch/arm/include/asm/assembler.h
-	#cp -f include/generated/autoconf.meda.h include/generated/autoconf.h
-fi
-C_H1="\033[1;32m"
-
-#for Sourcery_G++_Lite
-[ "${COMPILER_LIB/Sourcery/}" != "$COMPILER_LIB" ] && KBUILD_CFLAGS="$KBUILD_CFLAGS -mno-unaligned-access"
-#echo $KBUILD_CFLAGS
-
 #1. Image -> piggy.*
 printhl "Image ---> piggy.$compress_type"
 llsl=""
@@ -358,9 +296,14 @@ elif [ $compress_type = "xz" ]; then
 	printf $(size_append arch/arm/boot/Image)) > arch/arm/boot/compressed/piggy.xzkern
 
 	printhl "Compiling ashldi3.o"
-	$COMPILER-gcc -Wp,-MD,arch/arm/boot/compressed/.ashldi3.o.d  $NOSTDINC_FLAGS \
-	-D__ASSEMBLY__ $CFLAGS_ABI  -include asm/unified.h -msoft-float -gdwarf-2     \
-	-Wa,-march=all   -c -o arch/arm/boot/compressed/ashldi3.o arch/arm/lib/ashldi3.S
+	$COMPILER-gcc -Wp,-MD,arch/arm/boot/compressed/.ashldi3.o.d  -nostdinc \
+	-isystem $COMPILER_LIB/include -Iarch/arm/include -Iinclude  -include \
+	include/generated/autoconf.h -Isamsung/include -Isamsung/rfs_fsr/include \
+	-D__KERNEL__ -mlittle-endian -Iarch/arm/mach-omap2/include -Iarch/arm/plat-omap/include \
+	-D__ASSEMBLY__ -mabi=aapcs-linux -mno-thumb-interwork  -D__LINUX_ARM_ARCH__=7 -march=armv7-a \
+	-include asm/unified.h -msoft-float -gdwarf-2     -Wa,-march=all   -c -o \
+	arch/arm/boot/compressed/ashldi3.o arch/arm/lib/ashldi3.S
+
 elif [ $compress_type = "lzo" ]; then
 	(cat arch/arm/boot/Image | lzop -9 && printf $(size_append arch/arm/boot/Image)) \
 	> arch/arm/boot/compressed/piggy.lzo
@@ -368,23 +311,23 @@ fi
 
 #2. piggy.* -> piggy.*.o
 printhl "piggy.$compress_type ---> piggy.$compress_type.o"
-$COMPILER-gcc -Wp,-MD,arch/arm/boot/compressed/.piggy.$compress_type.o.d  $NOSTDINC_FLAGS -D__ASSEMBLY__ $CFLAGS_ABI  -include asm/unified.h -msoft-float -gdwarf-2     -Wa,-march=all   -c -o arch/arm/boot/compressed/piggy.$compress_type.o arch/arm/boot/compressed/piggy.$compress_type.S
+$COMPILER-gcc -Wp,-MD,arch/arm/boot/compressed/.piggy.$compress_type.o.d  -nostdinc -isystem $COMPILER_LIB/include -Iarch/arm/include -Iinclude  -include include/generated/autoconf.h -Isamsung/include -Isamsung/rfs_fsr/include -D__KERNEL__ -mlittle-endian -Iarch/arm/mach-omap2/include -Iarch/arm/plat-omap/include -D__ASSEMBLY__ -mabi=aapcs-linux -mno-thumb-interwork  -D__LINUX_ARM_ARCH__=7 -march=armv7-a  -include asm/unified.h -msoft-float -gdwarf-2     -Wa,-march=all   -c -o arch/arm/boot/compressed/piggy.$compress_type.o arch/arm/boot/compressed/piggy.$compress_type.S
 
 #3. head.o
 printhl "Compiling head.o"
-$COMPILER-gcc -Wp,-MD,arch/arm/boot/compressed/.head.o.d  $NOSTDINC_FLAGS -D__ASSEMBLY__ $CFLAGS_ABI  -include asm/unified.h -msoft-float -gdwarf-2     -Wa,-march=all   -c -o arch/arm/boot/compressed/head.o arch/arm/boot/compressed/head.S
+$COMPILER-gcc -Wp,-MD,arch/arm/boot/compressed/.head.o.d  -nostdinc -isystem $COMPILER_LIB/include -Iarch/arm/include -Iinclude  -include include/generated/autoconf.h -Isamsung/include -Isamsung/rfs_fsr/include -D__KERNEL__ -mlittle-endian -Iarch/arm/mach-omap2/include -Iarch/arm/plat-omap/include -D__ASSEMBLY__ -mabi=aapcs-linux -mno-thumb-interwork  -D__LINUX_ARM_ARCH__=7 -march=armv7-a  -include asm/unified.h -msoft-float -gdwarf-2     -Wa,-march=all   -c -o arch/arm/boot/compressed/head.o arch/arm/boot/compressed/head.S
 
 #4. misc.o
 printhl "Compiling misc.o"
-$COMPILER-gcc -Wp,-MD,arch/arm/boot/compressed/.misc.o.d  $NOSTDINC_FLAGS $KBUILD_CFLAGS -Os -marm -fno-omit-frame-pointer -mapcs -mno-sched-prolog $CFLAGS_ABI -msoft-float -Uarm -Wframe-larger-than=1024 -fno-stack-protector -fno-omit-frame-pointer -fno-optimize-sibling-calls -g -Wdeclaration-after-statement -Wno-pointer-sign -fno-strict-overflow -fconserve-stack -fpic -fno-builtin  $CFLAGS_KERNEL -D"KBUILD_STR(s)=\#s" -D"KBUILD_BASENAME=KBUILD_STR(misc)"  -D"KBUILD_MODNAME=KBUILD_STR(misc)"  -c -o arch/arm/boot/compressed/misc.o arch/arm/boot/compressed/misc.c 2>/dev/null >/dev/null
+$COMPILER-gcc -Wp,-MD,arch/arm/boot/compressed/.misc.o.d  -nostdinc -isystem $COMPILER_LIB/include -Iarch/arm/include -Iinclude  -include include/generated/autoconf.h -Isamsung/include -Isamsung/rfs_fsr/include -D__KERNEL__ -mlittle-endian -Iarch/arm/mach-omap2/include -Iarch/arm/plat-omap/include -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs -fno-strict-aliasing -fno-common -Werror-implicit-function-declaration -Wno-format-security -fno-delete-null-pointer-checks -Os -marm -fno-omit-frame-pointer -mapcs -mno-sched-prolog -mabi=aapcs-linux -mno-thumb-interwork -D__LINUX_ARM_ARCH__=7 -march=armv7-a -msoft-float -Uarm -include arch/arm/plat-omap/include/plat/mux_t1_rev_r07.h -D_SAMSUNG_BOARD_NAME=t1 -Wframe-larger-than=1024 -fno-stack-protector -fno-omit-frame-pointer -fno-optimize-sibling-calls -g -Wdeclaration-after-statement -Wno-pointer-sign -fno-strict-overflow -fconserve-stack -fpic -fno-builtin   -D"KBUILD_STR(s)=#s" -D"KBUILD_BASENAME=KBUILD_STR(misc)"  -D"KBUILD_MODNAME=KBUILD_STR(misc)"  -c -o arch/arm/boot/compressed/misc.o arch/arm/boot/compressed/misc.c
 
 #5. decompress.o
 printhl "Compiling decompress.o"
-$COMPILER-gcc -Wp,-MD,arch/arm/boot/compressed/.decompress.o.d  $NOSTDINC_FLAGS $KBUILD_CFLAGS -Os -marm -fno-omit-frame-pointer -mapcs -mno-sched-prolog $CFLAGS_ABI -msoft-float -Uarm -Wframe-larger-than=1024 -fno-stack-protector -fno-omit-frame-pointer -fno-optimize-sibling-calls -g -Wdeclaration-after-statement -Wno-pointer-sign -fno-strict-overflow -fconserve-stack -fpic -fno-builtin  $CFLAGS_KERNEL -D"KBUILD_STR(s)=\#s" -D"KBUILD_BASENAME=KBUILD_STR(decompress)"  -D"KBUILD_MODNAME=KBUILD_STR(decompress)"  -c -o arch/arm/boot/compressed/decompress.o arch/arm/boot/compressed/decompress.c
+$COMPILER-gcc -Wp,-MD,arch/arm/boot/compressed/.decompress.o.d  -nostdinc -isystem $COMPILER_LIB/include -Iarch/arm/include -Iinclude  -include include/generated/autoconf.h -Isamsung/include -Isamsung/rfs_fsr/include -D__KERNEL__ -mlittle-endian -Iarch/arm/mach-omap2/include -Iarch/arm/plat-omap/include -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs -fno-strict-aliasing -fno-common -Werror-implicit-function-declaration -Wno-format-security -fno-delete-null-pointer-checks -Os -marm -fno-omit-frame-pointer -mapcs -mno-sched-prolog -mabi=aapcs-linux -mno-thumb-interwork -D__LINUX_ARM_ARCH__=7 -march=armv7-a -msoft-float -Uarm -include arch/arm/plat-omap/include/plat/mux_t1_rev_r07.h -D_SAMSUNG_BOARD_NAME=t1 -Wframe-larger-than=1024 -fno-stack-protector -fno-omit-frame-pointer -fno-optimize-sibling-calls -g -Wdeclaration-after-statement -Wno-pointer-sign -fno-strict-overflow -fconserve-stack -fpic -fno-builtin   -D"KBUILD_STR(s)=#s" -D"KBUILD_BASENAME=KBUILD_STR(decompress)"  -D"KBUILD_MODNAME=KBUILD_STR(decompress)"  -c -o arch/arm/boot/compressed/decompress.o arch/arm/boot/compressed/decompress.c
 
 #6. lib1funcs.o
 printhl "Compiling lib1funcs.o"
-$COMPILER-gcc -Wp,-MD,arch/arm/boot/compressed/.lib1funcs.o.d  $NOSTDINC_FLAGS -D__ASSEMBLY__ $CFLAGS_ABI  -include asm/unified.h -msoft-float -gdwarf-2     -Wa,-march=all   -c -o arch/arm/boot/compressed/lib1funcs.o arch/arm/lib/lib1funcs.S
+$COMPILER-gcc -Wp,-MD,arch/arm/boot/compressed/.lib1funcs.o.d  -nostdinc -isystem $COMPILER_LIB/include -Iarch/arm/include -Iinclude  -include include/generated/autoconf.h -Isamsung/include -Isamsung/rfs_fsr/include -D__KERNEL__ -mlittle-endian -Iarch/arm/mach-omap2/include -Iarch/arm/plat-omap/include -D__ASSEMBLY__ -mabi=aapcs-linux -mno-thumb-interwork  -D__LINUX_ARM_ARCH__=7 -march=armv7-a  -include asm/unified.h -msoft-float -gdwarf-2     -Wa,-march=all   -c -o arch/arm/boot/compressed/lib1funcs.o arch/arm/lib/lib1funcs.S
 
 #7. vmlinux.lds
 printhl "Create vmlinux.lds"
@@ -392,7 +335,7 @@ sed "s/TEXT_START/0/;s/BSS_START/ALIGN(4)/" < arch/arm/boot/compressed/vmlinux.l
 
 #8. head.o + misc.o + piggy.*.o --> vmlinux
 printhl "head.o + misc.o + piggy.$compress_type.o + decompress.o + lib1funcs.o---> vmlinux"
-$COMPILER-ld -EL   --defsym zreladdr=0x40008000 --defsym params_phys=0x40000100 -p --no-undefined -X -T arch/arm/boot/compressed/vmlinux.lds arch/arm/boot/compressed/head.o arch/arm/boot/compressed/piggy.$compress_type.o arch/arm/boot/compressed/misc.o arch/arm/boot/compressed/decompress.o arch/arm/boot/compressed/lib1funcs.o $llsl -o arch/arm/boot/compressed/vmlinux
+$COMPILER-ld -EL    --defsym zreladdr=0x80008000 --defsym initrd_phys=0x80800000 --defsym params_phys=0x80000100 -p --no-undefined -X -T arch/arm/boot/compressed/vmlinux.lds arch/arm/boot/compressed/head.o arch/arm/boot/compressed/piggy.$compress_type.o arch/arm/boot/compressed/misc.o arch/arm/boot/compressed/decompress.o arch/arm/boot/compressed/lib1funcs.o $llsl -o arch/arm/boot/compressed/vmlinux
 
 #9. vmlinux -> zImage
 printhl "vmlinux ---> zImage"
@@ -429,7 +372,7 @@ elif [ $4-u = "su-u" ]; then
 	dd if=arch/arm/boot/zImage of=../$new_zImage_name bs=8388608 conv=sync 2>/dev/null >/dev/null
 	dd if=sufile.pad of=../$new_zImage_name bs=1 count=222976 seek=7000000 conv=notrunc 2>/dev/null >/dev/null
 else
-	cp -f arch/arm/boot/zImage ../$new_zImage_name	
+	cp -f arch/arm/boot/zImage ../$new_zImage_name
 fi
 
 printhl "$new_zImage_name has been created"

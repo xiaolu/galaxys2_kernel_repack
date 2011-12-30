@@ -2946,7 +2946,7 @@ extern unsigned int __machine_arch_type;
 #define MACH_TYPE_NETVIZ               2964
 #define MACH_TYPE_FLEXIBITY            2965
 #define MACH_TYPE_WLAN_COMPUTER        2966
-#define MACH_TYPE_C1                   2925
+#define MACH_TYPE_OMAP4_SAMSUNG        2160
 
 #ifdef CONFIG_ARCH_EBSA110
 # ifdef machine_arch_type
@@ -38156,16 +38156,16 @@ extern unsigned int __machine_arch_type;
 # define machine_is_wlan_computer()	(0)
 #endif
 
-#ifdef CONFIG_MACH_C1
+#ifdef CONFIG_MACH_OMAP4_SAMSUNG
 # ifdef machine_arch_type
 #  undef machine_arch_type
 #  define machine_arch_type	__machine_arch_type
 # else
-#  define machine_arch_type	MACH_TYPE_C1
+#  define machine_arch_type	MACH_TYPE_OMAP4_SAMSUNG
 # endif
-# define machine_is_c1()	(machine_arch_type == MACH_TYPE_C1)
+# define machine_is_omap4_samsung()	(machine_arch_type == MACH_TYPE_OMAP4_SAMSUNG)
 #else
-# define machine_is_c1()	(0)
+# define machine_is_omap4_samsung()	(0)
 #endif
 
 /*
