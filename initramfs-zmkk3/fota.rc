@@ -1,0 +1,198 @@
+#==============================================================================
+# Trigger : early-init
+#==============================================================================
+on early-init
+    insmod /lib/modules/st_drv.ko
+    insmod /lib/modules/bt_drv.ko
+    insmod /lib/modules/fm_drv.ko
+
+    start ueventd
+
+#==============================================================================
+# Trigger : init
+#==============================================================================
+on init
+
+sysclktz 0
+
+loglevel 3
+
+# setup the global environment
+    export PATH /sbin:/vendor/bin:/system/sbin:/system/bin:/system/xbin
+    export LD_LIBRARY_PATH /lib:/vendor/lib:/system/lib
+    export ANDROID_BOOTLOGO 1
+    export ANDROID_ROOT /system
+    export ANDROID_ASSETS /system/app
+    export ANDROID_DATA /data
+    export EXTERNAL_STORAGE /mnt/sdcard
+    export EXTERNAL_STORAGE2 /mnt/sdcard/external_sd
+    export USBHOST_STORAGE /mnt/sdcard/usbStorage
+    export ASEC_MOUNTPOINT /mnt/asec
+    export LOOP_MOUNTPOINT /mnt/obb
+    export BOOTCLASSPATH /system/framework/core.jar:/system/framework/bouncycastle.jar:/system/framework/ext.jar:/system/framework/framework.jar:/system/framework/android.policy.jar:/system/framework/services.jar:/system/framework/core-junit.jar
+
+# Backward compatibility
+    symlink /mnt/sdcard /sdcard
+    symlink /system/etc /etc
+
+
+
+    mkdir /system
+    mkdir /dbdata 0771 system system
+    mkdir /data 0771 system system
+    mkdir /cache 0770 system cache
+    
+    mkdir /mnt 0775 root root
+    mkdir /mnt/sdcard 0000 system system
+    
+ 
+
+#==============================================================================
+# Trigger : early-fs
+#==============================================================================
+#on early-fs
+
+#parameter block
+    mkdir /mnt/.lfs 0755 root root
+    insmod /lib/modules/j4fs.ko
+ 
+# mount param partition
+    mount j4fs /dev/block/mmcblk0p4 /mnt/.lfs
+    insmod /lib/modules/param.ko
+
+    mkdir /sdcard 0000 system system
+    chown system system /sdcard
+    chmod 0000 /sdcard
+    mkdir /system
+
+    mkdir /data 0771 system system
+    chown system system /data
+    chmod 0771 /data
+    
+    mkdir /efs 0771 system system
+    
+    mkdir /cache 0770 system cache
+    mkdir /config 0500 root root
+    chown system cache /cache
+    chmod 0770 /cache
+
+#==============================================================================
+# Trigger : fs
+#==============================================================================
+on fs
+
+    # mount partitions
+    mount tmpfs tmpfs /tmp
+    mount ext4 /dev/block/mmcblk0p9 /system wait
+
+    mkdir /data
+    mount ext4 /dev/block/mmcblk0p7 /cache nosuid nodev noatime wait
+    chown system cache /cache
+    chmod 0771 /cache
+
+    # SEC_DMCRYPT efs or cache or lfs partition required
+    mkdir /efs/smc-storage 0771 system system
+    chmod 0666 /dev/smodule
+
+    on property:devenc.pwdui.done=1
+    chmod 0666 /dev/smodule
+#  exec apply_smc_crypt
+
+    mount ext4 /dev/block/mmcblk0p10 /data  nosuid nodev noatime wait usedm discard,noauto_da_alloc
+    mount vfat /dev/block/mmcblk0p1 /sdcard crypt
+
+    chown system system /data
+    chmod 0771 /data
+    chmod 0777 /data/fota
+
+#==============================================================================
+# Trigger : post-fs
+#==============================================================================
+on post-fs
+
+    exec apply_disk_policy
+    #temp
+    chmod 750 /sbin/fat.format
+
+
+    # once everything is setup, no need to modify /
+    mount rootfs rootfs / ro remount
+
+
+#==============================================================================
+# Trigger : early-boot
+#==============================================================================
+#on early-boot
+
+#==============================================================================
+# Trigger : boot
+#==============================================================================
+on boot
+# basic network init
+    ifup lo
+    hostname localhost
+    domainname localdomain
+
+    #kj0225.park DeviceEncryption to Mount data partition with password encrypted
+    setprop devenc.pwdui.done 0    
+
+    class_start default
+
+## Daemon processes to be run by init.
+service ueventd /sbin/ueventd
+    critical
+
+service console /system/bin/sh
+    console
+    disabled
+    user shell
+    group log
+
+on property:ro.secure=0
+    start console
+
+# adbd is controlled by the persist.service.adb.enable system property
+service adbd /sbin/adbd
+    disabled
+
+on property:ro.secure=0
+    start adbd
+
+# Device Encryption
+service passcodemanager /system/bin/passcodemanager
+    oneshot
+
+
+
+## adb shell -->
+## adbd is controlled by the persist.service.adb.enable system property
+#service adbd /sbin/adbd
+#    disabled
+
+## adbd on at boot in emulator
+#on property:ro.kernel.qemu=1
+#    start adbd
+
+#on property:persist.service.adb.enable=1
+#    start adbd
+
+#on property:persist.service.adb.enable=0
+#    stop adbd
+
+## <-- adb shell
+
+# redbend_ua -->
+service redbend_ua /sbin/redbend_ua all
+    disabled
+    oneshot
+
+on property:devenc.pwdui.done=1
+    #mount rfs /dev/block/mmcblk0p2 /data nosuid nodev check=no
+    mount ext4 /dev/block/mmcblk0p10 /data nosuid nodev noatime wait crypt discard
+    chown system system /data
+    chmod 0771 /data 
+    chmod 0777 /data/fota
+    #mount vfat /dev/block/mmcblk0p1 /sdcard
+    start redbend_ua
+# <-- redbend_ua
+

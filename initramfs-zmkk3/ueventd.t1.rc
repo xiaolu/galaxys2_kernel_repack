@@ -1,0 +1,48 @@
+##
+# Copyright (C) 2010-2011, Samsung Electronics, Co., Ltd. All Rights Reserved.
+#  Written by System S/W Group, Open OS S/W R&D Team,
+#  Mobile Communication Division.
+##
+
+/dev/mpu		0660	system		system
+/dev/mpuirq		0660	system		system
+/dev/timerirq		0660	system		system
+
+/dev/i2c-4		0660	system		system
+/dev/syslink-proc4430	0660	system		system
+/dev/syslink-procmgr	0660	system		system
+/dev/notifyducatidrv	0660	system		system
+/dev/ipcnotify		0660	system		system
+/dev/syslink_ipc	0660	system		system
+/dev/syslink_platform	0660	system		system
+/dev/omap-rproc0	0660	system		system
+/dev/omap-rproc1	0660	system		system
+/dev/omap-rproc2	0660	system		system
+/dev/iovmm-omap0	0660	system		system
+/dev/iovmm-omap1	0660	system		system
+/dev/omap-devh0		0660	system		system
+/dev/omap-devh1		0660	system		system
+/dev/omap-devh2		0660	system		system
+/dev/snd/pcmC0D0c	0660	system		system
+/dev/snd/pcmC0D0p	0660	system		system
+/dev/snd/controlC0	0660	system		system
+/dev/snd/timer		0660	system		system
+/dev/snd/pcmC0D5c	0660	system		system
+/dev/snd/pcmC0D5p	0660	system		system
+/dev/video0		0660	system		system
+/dev/video1		0660	system		system
+/dev/video2		0660	system		system
+/dev/video3		0660	system		system
+/dev/video5		0660	system		camera
+/dev/tiler		0660	system		system
+/dev/onedram		0660	radio		radio
+/dev/dmm		0660	system		system
+/dev/fmradio            0660   system     audio
+/dev/tspdrv		0660	system		system
+/dev/ttyO0		0660 system		system
+/dev/ttyO1		0660 bluetooth		bluetooth
+/dev/ttyO2		0660 radio		radio
+/dev/usb/lp*		0660	system		usb
+
+# for AKM8975
+/dev/akm8975		0660	system	system
