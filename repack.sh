@@ -11,7 +11,6 @@ COMPILER_LIB=/home/xiaolu/bin/android-toolchain-eabi/lib/gcc/arm-eabi/4.5.4
 srcdir=`dirname $0`
 srcdir=`realpath $srcdir`
 RESOURCES=$srcdir/resources
-GEN_INITRAMFS=$srcdir/gen_initramfs.sh
 
 zImage="$1"
 new_ramdisk="$2"
@@ -225,14 +224,6 @@ dd if=$kernel bs=$start count=1 of=$head_image 2>/dev/null >/dev/null
 printhl "Making a tail.img ( from $headcount ~ $filesize )"
 dd if=$kernel bs=$headcount skip=1 of=$tail_image 2>/dev/null >/dev/null
 
-# Create new ramdisk Image
-
-#if [ -d $new_ramdisk ]; then
-#	printhl "$new_ramdisk is a directory,Generate initramfs.cpio"
-#	$GEN_INITRAMFS -o ./out/initramfs.cpio -u 1001 -g 2000 $new_ramdisk
-#	new_ramdisk="./out/initramfs.cpio"
-#fi
-
 toobig="TRUE"
 for method in "cat" "$cpio_compress_type -f9"; do
 	cat $new_ramdisk | $method - > $ramdisk_image
@@ -290,53 +281,6 @@ KBUILD_CFLAGS="-Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
 		   -Wno-format-security \
 		   -fno-delete-null-pointer-checks"
 CFLAGS_ABI="-mabi=aapcs-linux -mno-thumb-interwork -funwind-tables -D__LINUX_ARM_ARCH__=7 -march=armv7-a"
-
-C_H1="\033[1;36m"
-if [[ "${1/sy/}" != "$1" ]] && [ $compress_type = "xz" ]; then
-	#for Siyah
-	SIYAH_FLAGS="-fsched-spec-load -floop-interchange -floop-strip-mine -floop-block \
-		-funswitch-loops -fpredictive-commoning -fgcse-after-reload -fno-tree-vectorize \
-		-fipa-cp-clone -marm -mtune=cortex-a9 -march=armv7-a -pipe"
-	KBUILD_CFLAGS="$KBUILD_CFLAGS $SIYAH_FLAGS"
-	printhl "Prepare source code for 【Siyah】"
-	cp -f include/linux/kernel.siyah.h include/linux/kernel.h
-	cp -f include/linux/compiler.siyah.h include/linux/compiler.h
-	cp -f include/linux/compiler-gcc.siyah.h include/linux/compiler-gcc.h
-	cp -f include/linux/compiler-gcc4.siyah.h include/linux/compiler-gcc4.h
-	cp -f include/asm-generic/bug.siyah.h include/asm-generic/bug.h
-	cp -f include/generated/autoconf.siyah.h include/generated/autoconf.h
-	cp -f include/generated/utsrelease.siyah.h include/generated/utsrelease.h
-elif [[ "${1/vd/}" != "$1" ]] && [ $compress_type = "xz" ]; then
-	#for Void
-	KBUILD_CFLAGS="$KBUILD_CFLAGS -marm -march=armv7-a -mtune=cortex-a9 \
-			-mfpu=neon -mfloat-abi=softfp \
-			-fno-tree-vectorize \
-			-floop-interchange -floop-strip-mine -floop-block \
-			-pipe"
-	printhl "Prepare source code for 【Void】"
-	cp -f include/linux/kernel.void.h include/linux/kernel.h
-	cp -f arch/arm/include/asm/ptrace.void.h arch/arm/include/asm/ptrace.h
-	cp -f include/generated/autoconf.void.h include/generated/autoconf.h
-elif [[ "${1/md/}" != "$1" ]] && [ $compress_type = "gzip" ]; then
-	#for Androidmeda
-	CFLAGS_KERNEL="-finline-functions -funswitch-loops -fpredictive-commoning \
-			-fgcse-after-reload -ftree-vectorize -fipa-cp-clone \
-			-ffast-math -fsingle-precision-constant -pipe -mtune=cortex-a9 \
-			-mfpu=neon -march=armv7-a"
-	KBUILD_CFLAGS="$KBUILD_CFLAGS -mfloat-abi=softfp -funroll-loops \
-                	-floop-interchange -floop-strip-mine -floop-block \
-                	-fpredictive-commoning -ftree-vectorize \
-                	-funswitch-loops -fgcse-after-reload -fipa-cp-clone \
-                	-pipe \
-                	-marm -march=armv7-a -mtune=cortex-a9 \
-                	-mfpu=neon"
-
-	printhl "Prepare source code for 【Androidmeda】"
-	cp -f include/asm-generic/bug.siyah.h include/asm-generic/bug.h
-	cp -f arch/arm/include/asm/assembler.meda.h arch/arm/include/asm/assembler.h
-	#cp -f include/generated/autoconf.meda.h include/generated/autoconf.h
-fi
-C_H1="\033[1;32m"
 
 #for Sourcery_G++_Lite
 [ "${COMPILER_LIB/Sourcery/}" != "$COMPILER_LIB" ] && KBUILD_CFLAGS="$KBUILD_CFLAGS -mno-unaligned-access"
@@ -407,6 +351,7 @@ new_zImage_name="new_zImage"
 rm ../$new_zImage_name 2>/dev/null >/dev/null
 if [ $4-u = "payload-u" ]; then
 	printhl "Padding payload files to $new_zImage_name"
+	#Create BOOT_IMAGE_OFFSETS
 	boot_offset=$(count512 arch/arm/boot/zImage)
 	dd if=arch/arm/boot/zImage of=zImage512 bs=512 count=$boot_offset conv=sync 2>/dev/null >/dev/null
 	boot_offset=$((boot_offset+1))
@@ -429,7 +374,7 @@ elif [ $4-u = "su-u" ]; then
 	dd if=arch/arm/boot/zImage of=../$new_zImage_name bs=8388608 conv=sync 2>/dev/null >/dev/null
 	dd if=sufile.pad of=../$new_zImage_name bs=1 count=222976 seek=7000000 conv=notrunc 2>/dev/null >/dev/null
 else
-	cp -f arch/arm/boot/zImage ../$new_zImage_name	
+	cp -f arch/arm/boot/zImage ../$new_zImage_name
 fi
 
 printhl "$new_zImage_name has been created"
