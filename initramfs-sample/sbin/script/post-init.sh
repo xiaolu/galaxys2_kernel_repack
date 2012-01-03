@@ -16,6 +16,10 @@ boot_extract()
 	dd bs=512 if=/dev/block/mmcblk0p5 skip=$load_offset count=$load_len | xzcat | tar x
 	payload=1
 }
+a_echo()
+{
+	[ -e $2 ] && echo $1 > $2
+}
 
 properties()
 {
@@ -33,7 +37,8 @@ properties()
 modules()
 {
 	#android logger
-	[ -e /data/.siyah/disable-logger ] || modprobe logger
+	[ -e /data/.siyah/disable-logger ] || \
+		insmod /lib/modules/logger.ko;
 	# voodoo color
 	insmod /lib/modules/ld9040_voodoo.ko
 	# and sound
@@ -45,7 +50,7 @@ installs()
 {
 	$b mount -o remount,rw /system
 	echo "Checking Superuser installed"
-	if $b [ ! -f /system/bin/su ]; then
+	if [ ! -f /system/bin/su ]; then
 		[ -z $payload ] && boot_extract
 		rm /system/bin/su
 		rm /system/xbin/su
@@ -85,8 +90,8 @@ installs()
     	$b chmod 644 /system/lib/hw/lights.GT-I9100.so
 	fi
 
-	echo "ntfs-3g..."
-	if [ ! -s /system/xbin/ntfs-3g ];
+	echo "copy ntfs-3g..."
+	if [ ! -f /system/xbin/ntfs-3g ];
 	then
   		[ -z $payload ] && boot_extract
   		zcat /cache/misc/ntfs-3g.gz > /system/xbin/ntfs-3g
@@ -103,13 +108,14 @@ installs()
 	fi;
 	$b mount -o remount,ro /system
 }
+
 tweaks()
 {
 	echo "tweak..."
 	echo 0 > /proc/sys/kernel/siyah_feature_set
 	# IPv6 privacy tweak
 	#if $b [ "`$b grep IPV6PRIVACY /system/etc/tweaks.conf`" ]; then
-	echo "2" > /proc/sys/net/ipv6/conf/all/use_tempaddr
+	a_echo "2" /proc/sys/net/ipv6/conf/all/use_tempaddr
 	#fi
 	# Remount all partitions with noatime
 	for k in $($b mount | $b grep relatime | $b cut -d " " -f3)
@@ -147,6 +153,7 @@ tweaks()
 	touch /sdcard/clockworkmod/.salted_hash
 	) &
 }
+
 initscripts()
 {
 	(
@@ -159,6 +166,7 @@ initscripts()
 	echo $(date) USER INIT SCRIPTS DONE
 	) &
 }
+
 efsbackup()
 {
 	(
