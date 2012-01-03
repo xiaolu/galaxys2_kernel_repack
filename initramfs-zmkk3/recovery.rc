@@ -23,13 +23,11 @@ on init
     mkdir /system2
     mkdir /data 0771 system system
     mkdir /cache 0770 system cache
-    mkdir /efs
+    mkdir /efs 0771 radio system
     mkdir /tmp
     mkdir /dbdata
     mkdir /persist
     mkdir /mnt 0775 root root
-
-    #mount /tmp /tmp tmpfs   
 
 on early-fs
 
@@ -46,13 +44,8 @@ on early-fs
 on fs
     mount tmpfs tmpfs /tmp mode=0755    
     mount ext4 /dev/block/mmcblk0p9 /system wait rw
-    mount ext4 /dev/block/mmcblk0p7 /cache nosuid nodev noatime wait
-
-    # SEC_DMCRYPT move mounting efs befor apply_disk_policy, and set group id to system
-    mkdir /efs
+    mount ext4 /dev/block/mmcblk0p7 /cache nosuid nodev noatime wait rw
     mount ext4 /dev/block/mmcblk0p1 /efs nosuid nodev noatime wait 
-    chown radio system /efs
-    chmod 0771 /efs
 
     # verfiy filesystem (UMS)
     exec apply_system_policy /dev/block/mmcblk0p11 vfat
@@ -70,8 +63,6 @@ on post-fs
     write /proc/sys/kernel/sched_compat_yield 1
     write /proc/sys/kernel/sched_child_runs_first 0
 
-    # let recovery handle mounting /system
-    umount /system
 
 on boot
 
@@ -88,7 +79,6 @@ service console /sbin/sh
     console
 
 service adbd /sbin/adbd recovery
-    enabled
 
 service recovery /sbin/script/recovery.sh
 
