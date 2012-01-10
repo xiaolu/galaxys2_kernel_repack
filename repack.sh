@@ -162,8 +162,8 @@ find_start_end()
 		[ ! -z $end2 ] && end2=$((end2 + 4))
 		end=$((end1 + end2))
 		end=$((end - end%16))
-		cpio_compress_type=$compress_type
-		[ $compress_type = "lzo" ] && cpio_compress_type="lzop"
+		cpio_compress_type=gzip
+		#[ $compress_type = "lzo" ] && cpio_compress_type="lzop"
 	fi
 }
 
@@ -264,6 +264,7 @@ fi
 # rebuild zImage
 #============================================
 printhl "Now we are rebuilding the zImage"
+[ -z $5 ] || compress_type=$5
 rm -r resources_tmp 2>/dev/null >/dev/null
 mkdir resources_tmp
 cp -rn $RESOURCES/* ./resources_tmp/
@@ -349,7 +350,7 @@ printhl "Compiled new zImage size:$newzImagesize"
 new_zImage_name="new_zImage"
 [ -z $3 ] || new_zImage_name=$3
 rm ../$new_zImage_name 2>/dev/null >/dev/null
-if [ $4-u = "payload-u" ]; then
+if [[ "${4/payload/}" != "$4" ]]; then
 	printhl "Padding payload files to $new_zImage_name"
 	#Create BOOT_IMAGE_OFFSETS
 	boot_offset=$(count512 arch/arm/boot/zImage)
@@ -369,11 +370,11 @@ if [ $4-u = "payload-u" ]; then
 	[ $newzImagesize -gt 8388608 ] && printerr "zImage too big..." && exit 1
 	printhl "Padding new zImage to 8388608 bytes"
 	dd if=new_zImage of=../$new_zImage_name bs=8388608 conv=sync 2>/dev/null >/dev/null
-elif [ $4-u = "su-u" ]; then
+elif [[ "${4/su/}" != "$4" ]]; then
 	printhl "Padding sufiles to $new_zImage_name"
 	dd if=arch/arm/boot/zImage of=../$new_zImage_name bs=8388608 conv=sync 2>/dev/null >/dev/null
 	dd if=sufile.pad of=../$new_zImage_name bs=1 count=222976 seek=7000000 conv=notrunc 2>/dev/null >/dev/null
-elif [ $4-u = "pad-u" ]; then
+elif [[ "${4/pad/}" != "$4" ]]; then
 	printhl "Padding new zImage to 8388608 bytes"
 	dd if=arch/arm/boot/zImage of=../$new_zImage_name bs=8388608 conv=sync 2>/dev/null >/dev/null
 else
