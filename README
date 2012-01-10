@@ -24,4 +24,10 @@ Use tar.xz In the end of the zImage:
 
 	how to use,pls read initramfs-sample/sbin/script/post-init.sh & recovery.sh
 
-recovery.tar.xz and boot.tar.xz in resources directory，you can customize.
+	recovery.tar.xz and boot.tar.xz in resources directory，you can customize.
+
+Custom zImage compression type:
+	./repack.sh zImagesy262 initramfs.cpio zImage gzip
+	or
+	./repack.sh zImagesy262 initramfs.cpio zImage payload gzip
+

@@ -162,7 +162,7 @@ find_start_end()
 		[ ! -z $end2 ] && end2=$((end2 + 4))
 		end=$((end1 + end2))
 		end=$((end - end%16))
-		cpio_compress_type=gzip
+		cpio_compress_type="gzip"
 		#[ $compress_type = "lzo" ] && cpio_compress_type="lzop"
 	fi
 }
@@ -264,7 +264,14 @@ fi
 # rebuild zImage
 #============================================
 printhl "Now we are rebuilding the zImage"
-[ -z $5 ] || compress_type=$5
+if [ -z $5 ]; then
+	[[ "${4/gzip/}" != "$4" ]] && compress_type="gzip"
+	[[ "${4/xz/}" != "$4" ]] && compress_type="xz"
+	[[ "${4/lzo/}" != "$4" ]] && compress_type="lzo"
+	[[ "${4/lzma/}" != "$4" ]] && compress_type="lzma"
+else
+	compress_type=$5
+fi
 rm -r resources_tmp 2>/dev/null >/dev/null
 mkdir resources_tmp
 cp -rn $RESOURCES/* ./resources_tmp/
