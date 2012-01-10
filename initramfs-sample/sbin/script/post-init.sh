@@ -1,6 +1,6 @@
-#!/sbin/busybox8 sh
+#!/sbin/busybox sh
 
-b="/sbin/busybox8"
+b="/sbin/busybox"
 
 # Logging
 $b cp /data/user.log /data/user.log.bak
@@ -66,26 +66,26 @@ installs()
 		chmod 644 /system/app/Superuser.apk
 	fi
 
-	echo "Checking if cwmanager is installed"
-	if [ ! -f /system/app/CWMManager.apk ];
-	then
-		[ -z $payload ] && boot_extract
-		rm /system/app/CWMManager.apk
-		rm /data/dalvik-cache/*CWMManager.apk*
-		rm /data/app/eu.chainfire.cfroot.cwmmanager*.apk
-		zcat /cache/misc/CWMManager.apk.gz > /system/app/CWMManager.apk
-		chown 0.0 /system/app/CWMManager.apk
-		chmod 644 /system/app/CWMManager.apk
-	fi
+	#echo "Checking if cwmanager is installed"
+	#if [ ! -f /system/app/CWMManager.apk ];
+	#then
+	#	[ -z $payload ] && boot_extract
+	#	rm /system/app/CWMManager.apk
+	#	rm /data/dalvik-cache/*CWMManager.apk*
+	#	rm /data/app/eu.chainfire.cfroot.cwmmanager*.apk
+	#	zcat /cache/misc/CWMManager.apk.gz > /system/app/CWMManager.apk
+	#	chown 0.0 /system/app/CWMManager.apk
+	#	chmod 644 /system/app/CWMManager.apk
+	#fi
 
 	echo "liblight for BLN..."
 	lightsmd5sum=`$b md5sum /system/lib/hw/lights.GT-I9100.so | $b awk '{print $1}'`
 	blnlightsmd5sum=`$b md5sum /res/misc/lights.GT-I9100.so | $b awk '{print $1}'`
 	if [ "${lightsmd5sum}a" != "${blnlightsmd5sum}a" ];
   	then
-    	echo "Copying liblights"
-    	$b cp /system/lib/hw/lights.GT-I9100.so /system/lib/hw/lights.GT-I9100.so.BAK
-   		$b cp /res/misc/lights.GT-I9100.so /system/lib/hw/lights.GT-I9100.so
+		echo "Copying liblights"
+		$b cp /system/lib/hw/lights.GT-I9100.so /system/lib/hw/lights.GT-I9100.so.BAK
+		$b cp /res/misc/lights.GT-I9100.so /system/lib/hw/lights.GT-I9100.so
     	$b chown 0.0 /system/lib/hw/lights.GT-I9100.so
     	$b chmod 644 /system/lib/hw/lights.GT-I9100.so
 	fi
@@ -117,27 +117,15 @@ tweaks()
 	#if $b [ "`$b grep IPV6PRIVACY /system/etc/tweaks.conf`" ]; then
 	a_echo "2" /proc/sys/net/ipv6/conf/all/use_tempaddr
 	#fi
-	# Remount all partitions with noatime
-	for k in $($b mount | $b grep relatime | $b cut -d " " -f3)
-	do
-		sync
-		$b mount -o remount,noatime $k
-	done
-	# Remount ext4 partitions with optimizations
-	for k in $($b mount | $b grep ext4 | $b cut -d " " -f3)
-	do
-		sync
-		$b mount -o remount,commit=15 $k
-	done
+	a_echo "2" /proc/sys/net/ipv4/tcp_syn_retries
+	a_echo "2" /proc/sys/net/ipv4/tcp_synack_retries
+	a_echo "10" /proc/sys/net/ipv4/tcp_fin_timeout
 
 	# enable SCHED_MC
 	echo 1 > /sys/devices/system/cpu/sched_mc_power_savings
 	# Enable AFTR, default:2
 	echo 3 > /sys/module/cpuidle/parameters/enable_mask
 	$b sh /sbin/script/thunderbolt.sh
-	sysctl -w kernel.sched_min_granularity_ns=200000;
-	sysctl -w kernel.sched_latency_ns=400000;
-	sysctl -w kernel.sched_wakeup_granularity_ns=100000;
 	# fix for samsung roms - setting scaling_max_freq - gm
 	freq=`cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq`
 	if [ "$freq" != "1200" ];then
@@ -158,7 +146,7 @@ initscripts()
 {
 	(
 	echo $(date) USER INIT SCRIPTS START
-	[ -d /system/etc/init.d ] && $b run-parts /system/etc/init.d  
+	[ -d /system/etc/init.d ] && $b run-parts /system/etc/init.d
 	[ -d /data/init.d ] && $b run-parts /data/init.d
 	[ -f /system/bin/customboot.sh ] && $b sh /system/bin/customboot.sh
 	[ -f /system/xbin/customboot.sh ] && $b sh /system/xbin/customboot.sh

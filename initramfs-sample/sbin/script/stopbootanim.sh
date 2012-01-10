@@ -1,4 +1,4 @@
-#!/sbin/busybox8 sh
+#!/sbin/busybox sh
 
 if [ ! -f /.bootlock ]; then
   stop samsungani

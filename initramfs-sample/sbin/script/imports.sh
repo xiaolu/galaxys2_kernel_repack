@@ -1,9 +1,9 @@
-#!/sbin/busybox8 sh
+#!/sbin/busybox sh
 #### install boot logo ####
 # thanks to Hellcat
 # import/install custom boot logo if one exists
 # sdcard isn't mounted at this point, mount it for now
-b="/sbin/busybox8"
+b="/sbin/busybox"
 $b mount -o rw /dev/block/mmcblk0p11 /mnt/sdcard
 
 # import/install custom boot animation if one exists

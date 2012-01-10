@@ -30,7 +30,6 @@ loglevel 3
 # Backward compatibility
     symlink /system/etc /etc
     symlink /sys/kernel/debug /d
-    symlink /sbin/recovery /sbin/busybox8
 
 # Right now vendor lives on the same filesystem as system,
 # but someday that may change.
