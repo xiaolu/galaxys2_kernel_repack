@@ -11,7 +11,6 @@ COMPILER_LIB=/home/xiaolu/bin/android-toolchain-eabi/lib/gcc/arm-eabi/4.5.4
 srcdir=`dirname $0`
 srcdir=`realpath $srcdir`
 RESOURCES=$srcdir/resources
-GEN_INITRAMFS=$srcdir/gen_initramfs.sh
 
 zImage="$1"
 new_ramdisk="$2"
@@ -46,7 +45,6 @@ Not enough parameters or file not found!
 EOF
 	exit 1
 }
-
 # find start/end of initramfs in the zImage file
 find_start_end() 
 {
@@ -64,6 +62,7 @@ find_start_end()
 	[ -z $pos3 ] && pos3=$zImagesize
 	[ -z $pos4 ] && pos4=$zImagesize
 	minpos=`echo -e "$pos1\n$pos2\n$pos3\n$pos4" | sort -n | head -1`
+	rm -r out 2>/dev/null >/dev/null
 	mkdir out 2>/dev/null
 	if [ $minpos -eq $zImagesize ]; then
 		printerr "not found kernel from $zImage!"
@@ -163,8 +162,8 @@ find_start_end()
 		[ ! -z $end2 ] && end2=$((end2 + 4))
 		end=$((end1 + end2))
 		end=$((end - end%16))
-		cpio_compress_type=$compress_type
-		[ $compress_type = "lzo" ] && cpio_compress_type="lzop"
+		cpio_compress_type="gzip"
+		#[ $compress_type = "lzo" ] && cpio_compress_type="lzop"
 	fi
 }
 
@@ -180,6 +179,7 @@ function size_append()
 	}
 }
 
+#Calculation file size, 512 bytes integer times 
 function count512()
 {
 	fsize=$(stat -c "%s" $1);
@@ -190,6 +190,34 @@ function count512()
 	fi
  	printf $fsize
 }
+#use null string fill to 512 bytes integer times 
+function append512()
+{
+	dd if=$1 of=$2 bs=512 count=$3 conv=sync 2>/dev/null >/dev/null
+}
+function mkbootoffset()
+{
+	tempdir=$(mktemp -d)
+	boot_offset=$(count512 $2)
+	append512 $2 $tempdir/zImage512 $boot_offset
+	boot_offset=$((boot_offset+1))
+	boot_len=$(count512 $3)
+	boot512=$3
+	if [ $4 ]; then
+		recovery_offset=$((boot_offset+boot_len))
+		recovery_len=$(count512 $4)
+		#append512 $4 $tempdir/recovery512 $recovery_len
+		recovery_str="recovery_offset=$recovery_offset;recovery_len=$recovery_len;"
+		recovery512=$4
+		append512 $3 $tempdir/boot512 $boot_len
+		boot512=$tempdir/boot512
+	fi
+	printf "\n\nBOOT_IMAGE_OFFSETS\n" > $tempdir/BOOT_IMAGE_OFFSETS
+	printf "boot_offset=$boot_offset;boot_len=$boot_len;$recovery_str\n\n" >> $tempdir/BOOT_IMAGE_OFFSETS
+	append512 $tempdir/BOOT_IMAGE_OFFSETS $tempdir/BOOT_IMAGE_OFFSETS512 1
+	cat $tempdir/zImage512 $tempdir/BOOT_IMAGE_OFFSETS512 $boot512 $recovery512 > $1
+	rm -rf $tempdir
+}
 ###############################################################################
 #
 # code begins
@@ -198,7 +226,7 @@ function count512()
 
 printhl "---------------------------kernel repacker for i9100---------------------------"
 
-if [ "$1" == "" ] || [ "$2" == "" ] || [ ! -f $1 ] || [ ! -e $2 ]; then
+if [ -z $1 ] || [ -z $2 ] || [ ! -f $1 ] || [ ! -f $2 ]; then
 	exit_usage
 fi
 
@@ -208,11 +236,9 @@ printhl "CPIO image MAX size:$count"
 headcount=$((end + start))
 printhl "Head count:$headcount"
 
-#exit
-
 if [ $count -lt 0 ]; then
 	printerr "Could not correctly determine the start/end positions of the CPIO!"
-	exit
+	exit 1
 fi
 
 # Check the Image's size
@@ -224,14 +250,6 @@ dd if=$kernel bs=$start count=1 of=$head_image 2>/dev/null >/dev/null
 # Split the Image #2 ->  tail.img
 printhl "Making a tail.img ( from $headcount ~ $filesize )"
 dd if=$kernel bs=$headcount skip=1 of=$tail_image 2>/dev/null >/dev/null
-
-# Create new ramdisk Image
-
-#if [ -d $new_ramdisk ]; then
-#	printhl "$new_ramdisk is a directory,Generate initramfs.cpio"
-#	$GEN_INITRAMFS -o ./out/initramfs.cpio -u 1001 -g 2000 $new_ramdisk
-#	new_ramdisk="./out/initramfs.cpio"
-#fi
 
 toobig="TRUE"
 for method in "cat" "$cpio_compress_type -f9"; do
@@ -273,6 +291,14 @@ fi
 # rebuild zImage
 #============================================
 printhl "Now we are rebuilding the zImage"
+if [ -z $5 ]; then
+	[[ "${4/gzip/}" != "$4" ]] && compress_type="gzip"
+	[[ "${4/xz/}" != "$4" ]] && compress_type="xz"
+	[[ "${4/lzo/}" != "$4" ]] && compress_type="lzo"
+	[[ "${4/lzma/}" != "$4" ]] && compress_type="lzma"
+else
+	compress_type=$5
+fi
 rm -r resources_tmp 2>/dev/null >/dev/null
 mkdir resources_tmp
 cp -rn $RESOURCES/* ./resources_tmp/
@@ -348,30 +374,21 @@ printhl "Compiled new zImage size:$newzImagesize"
 new_zImage_name="new_zImage"
 [ -z $3 ] || new_zImage_name=$3
 rm ../$new_zImage_name 2>/dev/null >/dev/null
-if [ $4-u = "payload-u" ]; then
+if [[ "${4/payload/}" != "$4" ]]; then
+	[[ "${4/ics/}" != "$4" ]] && ics="-ics"
 	printhl "Padding payload files to $new_zImage_name"
-	boot_offset=$(count512 arch/arm/boot/zImage)
-	dd if=arch/arm/boot/zImage of=zImage512 bs=512 count=$boot_offset conv=sync 2>/dev/null >/dev/null
-	boot_offset=$((boot_offset+1))
-	boot_len=$(count512 boot.tar.xz)
-	recovery_offset=$((boot_offset+boot_len))
-	recovery_len=$(count512 recovery.tar.xz)
-	printf "\n\nBOOT_IMAGE_OFFSETS\n" > BOOT_IMAGE_OFFSETS
-	printf "boot_offset=$boot_offset;boot_len=$boot_len;recovery_offset=$recovery_offset;recovery_len=$recovery_len;\n\n" >> BOOT_IMAGE_OFFSETS
-	dd if=BOOT_IMAGE_OFFSETS of=BOOT_IMAGE_OFFSETS_512 bs=512 conv=sync 2>/dev/null >/dev/null
-	dd if=boot.tar.xz of=boot512 bs=512 count=$boot_len conv=sync 2>/dev/null >/dev/null
-	dd if=recovery.tar.xz of=recovery512 bs=512 count=$recovery_len conv=sync 2>/dev/null >/dev/null
-	cat zImage512 BOOT_IMAGE_OFFSETS_512 boot512 recovery512 > new_zImage
+	mkbootoffset new_zImage arch/arm/boot/zImage boot$ics.tar.xz recovery$ics.tar.xz
+	#mkbootoffset new_zImage arch/arm/boot/zImage boot$ics.tar.xz
 	newzImagesize=$(stat -c "%s" new_zImage)
 	printhl "Now zImage size:$newzImagesize"
 	[ $newzImagesize -gt 8388608 ] && printerr "zImage too big..." && exit 1
 	printhl "Padding new zImage to 8388608 bytes"
 	dd if=new_zImage of=../$new_zImage_name bs=8388608 conv=sync 2>/dev/null >/dev/null
-elif [ $4-u = "su-u" ]; then
+elif [[ "${4/su/}" != "$4" ]]; then
 	printhl "Padding sufiles to $new_zImage_name"
 	dd if=arch/arm/boot/zImage of=../$new_zImage_name bs=8388608 conv=sync 2>/dev/null >/dev/null
 	dd if=sufile.pad of=../$new_zImage_name bs=1 count=222976 seek=7000000 conv=notrunc 2>/dev/null >/dev/null
-elif [ $4-u = "pad-u" ]; then
+elif [[ "${4/pad/}" != "$4" ]]; then
 	printhl "Padding new zImage to 8388608 bytes"
 	dd if=arch/arm/boot/zImage of=../$new_zImage_name bs=8388608 conv=sync 2>/dev/null >/dev/null
 else

@@ -7,7 +7,7 @@ Unpack zImage,Example:
 	./unpack.sh zImagezmkk3 initramfs-zmkk3
 
 Generate a cpio packed initramfs,Example:
-	./gen_initramfs.sh -o zmkk3.cpio -u 0 -g 0 ./initramfs-zmkk3
+	./gen_initramfs.sh -o zmkk3.cpio -u 1000 -g 1000 ./initramfs-zmkk3
 
 Repack zImage,Example:
 	./repack.sh zImagezmkk3 zmkk3.cpio zImage
