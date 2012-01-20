@@ -1,0 +1,143 @@
+on early-init
+    start ueventd
+
+on init
+
+sysclktz 0
+
+loglevel 3
+
+    export PATH /sbin:/vendor/bin:/system/sbin:/system/bin:/system/xbin
+    export LD_LIBRARY_PATH /vendor/lib:/system/lib
+    export ANDROID_BOOTLOGO 1
+    export ANDROID_ROOT /system
+    export ANDROID_ASSETS /system/app
+    export ANDROID_DATA /data
+    
+    export EXTERNAL_STORAGE /mnt/sdcard
+    export EXTERNAL_STORAGE2 /mnt/sdcard/external_sd
+    export USBHOST_STORAGE /mnt/sdcard/usbStorage
+
+    export ASEC_MOUNTPOINT /mnt/asec
+    export LOOP_MOUNTPOINT /mnt/obb
+    export BOOTCLASSPATH /system/framework/core.jar:/system/framework/bouncycastle.jar:/system/framework/ext.jar:/system/framework/framework.jar:/system/framework/android.policy.jar:/system/framework/services.jar:/system/framework/core-junit.jar
+    export TMPDIR /data/local/tmp
+    
+    # Backwards Compat - XXX: Going away in G*
+    symlink /mnt/sdcard /sdcard
+    symlink /system/etc /etc
+
+    mkdir /system
+    mkdir /data 0771 system system
+    mkdir /cache 0770 system cache
+
+    mkdir /mnt 0775 root system
+    mkdir /mnt/sdcard 0000 system system
+
+    #mount /tmp /tmp tmpfs   
+
+on early-fs
+
+    # rfs drivers
+    # insmod /lib/modules/fsr.ko
+    # insmod /lib/modules/fsr_stl.ko
+    # insmod /lib/modules/rfs_glue.ko
+    # insmod /lib/modules/rfs_fat.ko
+       
+
+    # parameter block
+    mkdir /mnt/.lfs 0755 root root
+    insmod /lib/modules/j4fs.ko
+    mount j4fs /dev/block/mmcblk0p4 /mnt/.lfs
+    insmod /lib/modules/param.ko
+    
+    insmod /lib/modules/drop_caches.ko
+    
+    mkdir /sdcard 0000 system system
+    chown system system /sdcard
+    chmod 0000 /sdcard
+    mkdir /system
+    mkdir /data 0771 system system
+    chown system system /data
+    chmod 0771 /data
+    mkdir /efs 0771 system system
+    mkdir /cache 0770 system cache
+    mkdir /config 0500 root root
+    chown system cache /cache
+    chmod 0770 /cache
+
+on fs
+    mount tmpfs tmpfs /tmp
+    //mount rfs /dev/block/stl9 /system check=no
+    mount ext4 /dev/block/mmcblk0p9 /system wait
+    
+    #exec apply_system_policy /dev/block/mmcblk0p10 ext4
+    #exec apply_system_policy /dev/block/mmcblk0p11mmcblk0p11
+    
+    mkdir /data
+ 
+	  #mount rfs /dev/block/stl11 /cache nosuid nodev check=no
+	  mount ext4 /dev/block/mmcblk0p7 /cache nosuid nodev noatime wait
+    chown system cache /cache
+    chmod 0770 /cache
+    
+    #mount rfs /dev/block/stl3 /efs nosuid nodev check=no
+
+on post-fs
+
+    #temp
+    chmod 750 /sbin/fat.format
+    mount rootfs rootfs / ro remount
+  
+    write /proc/sys/kernel/panic_on_oops 1
+    write /proc/sys/kernel/hung_task_timeout_secs 0
+    write /proc/cpu/alignment 4
+    write /proc/sys/kernel/sched_latency_ns 10000000
+    write /proc/sys/kernel/sched_wakeup_granularity_ns 2000000
+    write /proc/sys/kernel/sched_compat_yield 1
+    write /proc/sys/kernel/sched_child_runs_first 0
+    	
+on boot
+
+    ifup lo
+    hostname localhost
+    domainname localdomain
+
+    #kj0225.park DeviceEncryption to Mount data partition with password encrypted
+    setprop devenc.pwdui.done 0    
+
+    class_start default
+    
+service ueventd /sbin/ueventd
+    critical
+    
+## Daemon processes to be run by init.
+##
+#service console /system/bin/sh
+#    console
+
+# adbd is controlled by the persist.service.adb.enable system property
+#service adbd /sbin/adbd
+#    disabled
+
+#on property:persist.service.adb.enable=1
+#    start adbd
+
+#on property:persist.service.adb.enable=0
+#    stop adbd
+
+service passcodemanager /system/bin/passcodemanager
+    oneshot
+
+service redbend_ua /sbin/redbend_ua all
+    disabled
+    oneshot
+
+on property:devenc.pwdui.done=1
+    #mount rfs /dev/block/mmcblk0p2 /data nosuid nodev check=no
+    mount ext4 /dev/block/mmcblk0p10 /data nosuid nodev noatime wait crypt discard
+    chown system system /data
+    chmod 0771 /data 
+    chmod 0777 /data/fota
+    #mount vfat /dev/block/mmcblk0p1 /sdcard
+    start redbend_ua

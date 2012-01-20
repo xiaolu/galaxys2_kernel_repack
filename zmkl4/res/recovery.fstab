@@ -1,0 +1,18 @@
+[device]
+# mount point	fstype		device			format option	mount option
+/efs		ext4		/dev/block/mmcblk0p1	default			default
+/cache		ext4		/dev/block/mmcblk0p7	default			default
+/system		ext4		/dev/block/mmcblk0p9	default			default
+/data		ext4		/dev/block/mmcblk0p10	default			default
+/sdcard		vfat		/dev/block/mmcblk0p11	default			default
+/preload	ext4		/dev/block/mmcblk0p12	default			default
+
+[format]
+#index		option
+rfs16	"/sbin/fat.format -F 16 -s 1 -S 4096"
+rfs32	"/sbin/fat.format -F 32 -s 4 -S 4096"
+
+[mount]
+#index			flags					options
+rfs_opt1		nosuid,noatime,nodev,nodiratime		"check=no"
+rfs_opt2		nosuid,nodev				"check=no"

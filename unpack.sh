@@ -56,6 +56,7 @@ function unpack_kernel()
     [ -z $pos2 ] && pos2=$zImagesize
     [ -z $pos3 ] && pos3=$zImagesize
     [ -z $pos4 ] && pos4=$zImagesize
+
     minpos=`echo -e "$pos1\n$pos2\n$pos3\n$pos4" | sort -n | head -1`
     if [ $minpos -eq $zImagesize ]; then
 	printerr "not found kernel from $zImage!"
