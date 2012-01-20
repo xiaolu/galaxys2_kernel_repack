@@ -23,7 +23,7 @@ workdir=`pwd`
 
 C_H1="\033[1;32m"
 C_ERR="\033[1;31m"
-C_CLEAR="\033[1;0m"
+C_CLEAR="\033[0;0m"
 
 printhl() {
 	printf "${C_H1}${1}${C_CLEAR} \n"
@@ -40,7 +40,8 @@ cleanup()
 }
 
 exit_usage() {
-cat << EOF
+	printf $C_H1
+	cat << EOF
 Usage:$0 <zImage> <initramfs> [new_zImage_name] [c_type or payload] [c_type]
 	zImage		= the zImage file (kernel) you wish to repack
 	initramfs	= the initramfs you wish to pack into the zImage(file or directory)
@@ -64,16 +65,17 @@ Use payload "tar.xz" in end of zImage:
 	$0 zImagesy267 initramfs.cpio new_zImage payload
 
 	how to use,pls read initramfs-sample/sbin/script/post-init.sh & recovery.sh
-
 	recovery.tar.xz and boot.tar.xz in resources directory，you can customize.
 
 Custom zImage compression type:
-	$0 zImagesy267 initramfs.cpio zImage gzip
+	$0 zImagesy267 initramfs.cpio new_zImage gzip
 	or
-	$0 zImagesy267 initramfs.cpio zImage payload gzip
+	$0 zImagesy267 initramfs.cpio new_zImage payload gzip
 
 EOF
-	cleanup && exit 1
+	printf $C_CLEAR
+	rm -rf $tempdir
+	exit 1
 }
 
 # find start/end of initramfs in the zImage file
