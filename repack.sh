@@ -1,24 +1,24 @@
 #!/bin/bash
 ##############################################################################
 # you should point where your cross-compiler is         
-COMPILER=/home/xiaolu/bin/android-toolchain-eabi/bin/arm-eabi
-COMPILER_LIB=/home/xiaolu/bin/android-toolchain-eabi/lib/gcc/arm-eabi/4.5.4
-#COMPILER=/home/xiaolu/CodeSourcery/Sourcery_G++_Lite/bin/arm-none-eabi
-#COMPILER_LIB=/home/xiaolu/CodeSourcery/Sourcery_G++_Lite/lib/gcc/arm-none-eabi/4.5.2
+#COMPILER=/home/xiaolu/bin/android-toolchain-eabi/bin/arm-eabi
+#COMPILER_LIB=/home/xiaolu/bin/android-toolchain-eabi/lib/gcc/arm-eabi/4.5.4
+COMPILER=/home/xiaolu/CodeSourcery/Sourcery_G++_Lite/bin/arm-none-eabi
+COMPILER_LIB=/home/xiaolu/CodeSourcery/Sourcery_G++_Lite/lib/gcc/arm-none-eabi/4.5.2
 ##############################################################################
 #set -x
 
 srcdir=`dirname $0`
-srcdir=`realpath $srcdir`
+srcdir=`realpath -s $srcdir`
 RESOURCES=$srcdir/resources
-
 zImage="$1"
 new_ramdisk="$2"
-kernel="./out/kernel.image"
-test_unzipped_cpio="./out/cpio.image"
-head_image="./out/head.image"
-tail_image="./out/tail.image"
-ramdisk_image="./out/ramdisk.image"
+tempdir=$(mktemp -d)
+kernel="$tempdir/kernel.image"
+test_unzipped_cpio="$tempdir/cpio.image"
+head_image="$tempdir/head.image"
+tail_image="$tempdir/tail.image"
+ramdisk_image="$tempdir/ramdisk.image"
 workdir=`pwd`
 
 C_H1="\033[1;32m"
@@ -26,24 +26,54 @@ C_ERR="\033[1;31m"
 C_CLEAR="\033[1;0m"
 
 printhl() {
-	printf "${C_H1}[I] ${1}${C_CLEAR} \n"
+	printf "${C_H1}${1}${C_CLEAR} \n"
 }
 
 printerr() {
-	printf "${C_ERR}[E] ${1}${C_CLEAR} \n"
+	printf "${C_ERR}[Err] ${1}${C_CLEAR} \n"
+}
+
+cleanup()
+{
+	printhl "Cleaning up...\nfinished..."
+	rm -rf $tempdir
 }
 
 exit_usage() {
 cat << EOF
-Usage:$0 <zImage> <initramfs>
-	zImage          = the zImage file (kernel) you wish to repack
-	initramfs  = the cpio (initramfs) you wish to pack into the zImage
-		     file or directory
+Usage:$0 <zImage> <initramfs> [new_zImage_name] [c_type or payload] [c_type]
+	zImage		= the zImage file (kernel) you wish to repack
+	initramfs	= the initramfs you wish to pack into the zImage(file or directory)
+	new_zImage	= new zImage name
+	c_type		= compression type(gzip lzo lzma xz)
+	payload		= padding payload files to new zImage
 
-Not enough parameters or file not found!
+Error:Not enough parameters or file not found!
+
+Repack zImage,Example:
+	$0 zImagesys267 initramfs.cpio zImage
+
+Padding sufile to zImage offset=7000000,Example:
+	$0 zImagesy267 sy267.cpio new_zImage su
+
+	how to use sufile:
+	dd if=/dev/block/mmcblk0p5 of=/system/app/Superuser.apk skip=7026336 seek=0 bs=1 count=196640
+	dd if=/dev/block/mmcblk0p5 of=/system/bin/su skip=7000000 seek=0 bs=1 count=26336
+
+Use payload "tar.xz" in end of zImage:
+	$0 zImagesy267 initramfs.cpio new_zImage payload
+
+	how to use,pls read initramfs-sample/sbin/script/post-init.sh & recovery.sh
+
+	recovery.tar.xz and boot.tar.xz in resources directory，you can customize.
+
+Custom zImage compression type:
+	$0 zImagesy267 initramfs.cpio zImage gzip
+	or
+	$0 zImagesy267 initramfs.cpio zImage payload gzip
 
 EOF
-	exit 1
+	cleanup && exit 1
 }
 
 # find start/end of initramfs in the zImage file
@@ -63,11 +93,9 @@ find_start_end()
 	[ -z $pos3 ] && pos3=$zImagesize
 	[ -z $pos4 ] && pos4=$zImagesize
 	minpos=`echo -e "$pos1\n$pos2\n$pos3\n$pos4" | sort -n | head -1`
-	rm -r out 2>/dev/null >/dev/null
-	mkdir out 2>/dev/null
 	if [ $minpos -eq $zImagesize ]; then
 		printerr "not found kernel from $zImage!"
-		exit 1
+		cleanup && exit 1
 	elif [ $minpos -eq $pos1 ]; then
 		printhl "Extracting gzip'd kernel from $zImage (start = $pos1)"
 		dd if=$zImage of="$kernel.gz" bs=$pos1 skip=1 2>/dev/null >/dev/null
@@ -148,8 +176,8 @@ find_start_end()
 		end_zero='[\x01-\xff]\x00{8}'
 		#end_zero='\x00{16}[\x01-\xff]'
 		end=`grep -P -a -b -m 1 -o $end_zero $test_unzipped_cpio | cut -f 1 -d : | head -1`
-		#[ ! -z $end ] && end=$((end + 16))		
-		[ ! -z $end ] && end=$((end + 2))
+		#[ $end ] && end=$((end + 16))		
+		[ $end ] && end=$((end + 2))
 		#end=$((end - end%16))
 		cpio_compress_type=$compression_name
 	else
@@ -160,7 +188,7 @@ find_start_end()
 		dd if=$test_unzipped_cpio of=$test_unzipped_cpio.tmp bs=$end1 skip=1 2>/dev/null >/dev/null
 		end_zero='\x00{4}[\x01-\xff]'
 		end2=`grep -P -a -b -m 1 -o $end_zero "$test_unzipped_cpio.tmp" | cut -f 1 -d : | head -1`
-		[ ! -z $end2 ] && end2=$((end2 + 4))
+		[ $end2 ] && end2=$((end2 + 4))
 		end=$((end1 + end2))
 		end=$((end - end%16))
 		cpio_compress_type="gzip"
@@ -198,7 +226,7 @@ function append512()
 }
 function mkbootoffset()
 {
-	tempdir=$(mktemp -d)
+	#tempdir=$(mktemp -d)
 	boot_offset=$(count512 $2)
 	append512 $2 $tempdir/zImage512 $boot_offset
 	boot_offset=$((boot_offset+1))
@@ -217,7 +245,7 @@ function mkbootoffset()
 	printf "boot_offset=$boot_offset;boot_len=$boot_len;$recovery_str\n\n" >> $tempdir/BOOT_IMAGE_OFFSETS
 	append512 $tempdir/BOOT_IMAGE_OFFSETS $tempdir/BOOT_IMAGE_OFFSETS512 1
 	cat $tempdir/zImage512 $tempdir/BOOT_IMAGE_OFFSETS512 $boot512 $recovery512 > $1
-	rm -rf $tempdir
+	#rm -rf $tempdir
 }
 ###############################################################################
 #
@@ -227,7 +255,7 @@ function mkbootoffset()
 
 printhl "---------------------------kernel repacker for i9100---------------------------"
 
-if [ -z $1 ] || [ -z $2 ] || [ ! -f $1 ] || [ ! -f $2 ]; then
+if [ -z $1 ] || [ -z $2 ] || [ ! -f $1 ] || [ ! -e $2 ]; then
 	exit_usage
 fi
 
@@ -239,7 +267,15 @@ printhl "Head count:$headcount"
 
 if [ $count -lt 0 ]; then
 	printerr "Could not correctly determine the start/end positions of the CPIO!"
-	exit 1
+	cleanup && exit 1
+fi
+
+if [ -d $new_ramdisk ]; then
+	printhl "make initramfs.cpio"
+	cd $new_ramdisk
+	find | fakeroot cpio -H newc -o > $tempdir/initramfs.cpio 2>/dev/null
+	new_ramdisk=$tempdir/initramfs.cpio
+	cd $workdir
 fi
 
 # Check the Image's size
@@ -266,26 +302,26 @@ done
 
 if [ "$toobig" == "TRUE" ]; then
 	printerr "New ramdisk is still too big. Repack failed. $ramdsize > $count"
-	exit
+	cleanup && exit 1
 fi
 
 #Merge head.img + ramdisk
-cat $head_image $ramdisk_image > out/franken.img
-franksize=$(stat -c "%s" out/franken.img)
+cat $head_image $ramdisk_image > $tempdir/franken.img
+franksize=$(stat -c "%s" $tempdir/franken.img)
 
 #Merge head.img + ramdisk + padding + tail
 if [ $franksize -lt $headcount ]; then
 	printhl "Merging [head+ramdisk] + padding + tail"
 	tempnum=$((headcount - franksize))
-	dd status=noxfer if=/dev/zero bs=$tempnum count=1 of=out/padding 2>/dev/null >/dev/null
-	cat out/padding $tail_image > out/newtail.img
-	cat out/franken.img out/newtail.img > out/new_Image
+	dd status=noxfer if=/dev/zero bs=$tempnum count=1 of=$tempdir/padding 2>/dev/null >/dev/null
+	cat $tempdir/padding $tail_image > $tempdir/newtail.img
+	cat $tempdir/franken.img $tempdir/newtail.img > $tempdir/new_Image
 elif [ $franksize -eq $headcount ]; then
 	printhl "Merging [head+ramdisk] + tail"
-	cat out/franken.img $tail_image > out/new_Image
+	cat $tempdir/franken.img $tail_image > $tempdir/new_Image
 else
 	printerr "Combined zImage is too large - original end is $end and new end is $franksize"
-	exit
+	cleanup && exit 1
 fi
 
 #============================================
@@ -300,12 +336,10 @@ if [ -z $5 ]; then
 else
 	compress_type=$5
 fi
-rm -r resources_tmp 2>/dev/null >/dev/null
-mkdir resources_tmp
-cp -rn $RESOURCES/* ./resources_tmp/
-cd resources_tmp
-cp ../out/new_Image arch/arm/boot/Image
-cp -f include/generated/autoconf.$compress_type.h include/generated/autoconf.h 2>/dev/null >/dev/null
+cp -rf $RESOURCES $tempdir/resources_tmp
+cd $tempdir/resources_tmp
+cp $tempdir/new_Image arch/arm/boot/Image
+cp -f include/generated/autoconf.$compress_type.h include/generated/autoconf.h
 
 NOSTDINC_FLAGS="-nostdinc -isystem $COMPILER_LIB/include -Iarch/arm/include \
 		-Iinclude  -include include/generated/autoconf.h -D__KERNEL__ \
@@ -371,7 +405,8 @@ printhl "Create vmlinux.lds"
 sed "s/TEXT_START/0/;s/BSS_START/ALIGN(4)/" < arch/arm/boot/compressed/vmlinux.lds.in > arch/arm/boot/compressed/vmlinux.lds
 
 #8. head.o + misc.o + piggy.*.o --> vmlinux
-printhl "head.o + misc.o + piggy.$compress_type.o + decompress.o + lib1funcs.o---> vmlinux"
+[ $llsl ] && ashldi3=" + ashldi3.o"
+printhl "head.o + misc.o + piggy.$compress_type.o + decompress.o + lib1funcs.o$ashldi3---> vmlinux"
 $COMPILER-ld -EL   --defsym zreladdr=0x40008000 --defsym params_phys=0x40000100 -p --no-undefined -X -T arch/arm/boot/compressed/vmlinux.lds arch/arm/boot/compressed/head.o arch/arm/boot/compressed/piggy.$compress_type.o arch/arm/boot/compressed/misc.o arch/arm/boot/compressed/decompress.o arch/arm/boot/compressed/lib1funcs.o $llsl -o arch/arm/boot/compressed/vmlinux
 
 #9. vmlinux -> zImage
@@ -383,32 +418,32 @@ newzImagesize=$(stat -c "%s" arch/arm/boot/zImage)
 printhl "Compiled new zImage size:$newzImagesize"
 
 new_zImage_name="new_zImage"
-[ -z $3 ] || new_zImage_name=$3
-rm ../$new_zImage_name 2>/dev/null >/dev/null
+[ $3 ] && new_zImage_name=$3
+if [ ${new_zImage_name:0:1} != "/" ]; then
+	new_zImage_name="$workdir/$new_zImage_name"
+fi
+rm $new_zImage_name 2>/dev/null >/dev/null
 if [[ "${4/payload/}" != "$4" ]]; then
 	[[ "${4/ics/}" != "$4" ]] && ics="-ics"
-	printhl "Padding payload files to $new_zImage_name"
+	printhl "Padding payload files to $(basename $new_zImage_name)"
 	mkbootoffset new_zImage arch/arm/boot/zImage boot$ics.tar.xz recovery$ics.tar.xz
 	#mkbootoffset new_zImage arch/arm/boot/zImage boot$ics.tar.xz
 	newzImagesize=$(stat -c "%s" new_zImage)
 	printhl "Now zImage size:$newzImagesize"
-	[ $newzImagesize -gt 8388608 ] && printerr "zImage too big..." && exit 1
+	[ $newzImagesize -gt 8388608 ] && printerr "zImage too big..." && cleanup && exit 1
 	printhl "Padding new zImage to 8388608 bytes"
-	dd if=new_zImage of=../$new_zImage_name bs=8388608 conv=sync 2>/dev/null >/dev/null
+	dd if=new_zImage of=$new_zImage_name bs=8388608 conv=sync 2>/dev/null >/dev/null
 elif [[ "${4/su/}" != "$4" ]]; then
 	printhl "Padding sufiles to $new_zImage_name"
-	dd if=arch/arm/boot/zImage of=../$new_zImage_name bs=8388608 conv=sync 2>/dev/null >/dev/null
-	dd if=sufile.pad of=../$new_zImage_name bs=1 count=222976 seek=7000000 conv=notrunc 2>/dev/null >/dev/null
+	dd if=arch/arm/boot/zImage of=$new_zImage_name bs=8388608 conv=sync 2>/dev/null >/dev/null
+	dd if=sufile.pad of=$new_zImage_name bs=1 count=222976 seek=7000000 conv=notrunc 2>/dev/null >/dev/null
 elif [[ "${4/pad/}" != "$4" ]]; then
 	printhl "Padding new zImage to 8388608 bytes"
-	dd if=arch/arm/boot/zImage of=../$new_zImage_name bs=8388608 conv=sync 2>/dev/null >/dev/null
+	dd if=arch/arm/boot/zImage of=$new_zImage_name bs=8388608 conv=sync 2>/dev/null >/dev/null
 else
-	cp -f arch/arm/boot/zImage ../$new_zImage_name
+	cp -f arch/arm/boot/zImage $new_zImage_name
 fi
 
-printhl "$new_zImage_name has been created"
-printhl "Cleaning up..."
-rm -rf ../out
-rm -rf ../resources_tmp
-cd ../
-printhl "finished..."
+printhl "$(basename $new_zImage_name) has been created"
+cd $workdir
+cleanup
