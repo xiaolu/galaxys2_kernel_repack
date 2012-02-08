@@ -2,9 +2,11 @@
 ##############################################################################
 # you should point where your cross-compiler is         
 #COMPILER=/home/xiaolu/bin/android-toolchain-eabi/bin/arm-eabi
-#COMPILER_LIB=/home/xiaolu/bin/android-toolchain-eabi/lib/gcc/arm-eabi/4.5.4
+#COMPILER_LIB=/home/xiaolu/bin/android-toolchain-eabi/lib/gcc/arm-eabi/4.6.3
 COMPILER=/home/xiaolu/CodeSourcery/Sourcery_G++_Lite/bin/arm-none-eabi
 COMPILER_LIB=/home/xiaolu/CodeSourcery/Sourcery_G++_Lite/lib/gcc/arm-none-eabi/4.5.2
+#COMPILER=/home/xiaolu/CodeSourcery/arm-2009q3/bin/arm-none-eabi
+#COMPILER_LIB=/home/xiaolu/CodeSourcery/arm-2009q3/lib/gcc/arm-none-eabi/4.4.1
 ##############################################################################
 #set -x
 
@@ -345,17 +347,20 @@ cp -f include/generated/autoconf.$compress_type.h include/generated/autoconf.h
 
 NOSTDINC_FLAGS="-nostdinc -isystem $COMPILER_LIB/include -Iarch/arm/include \
 		-Iinclude  -include include/generated/autoconf.h -D__KERNEL__ \
-		-mlittle-endian -Iarch/arm/mach-s5pv310/include \
+		-mlittle-endian -Iarch/arm/mach-s5pv210/include \
 		-Iarch/arm/plat-s5p/include -Iarch/arm/plat-samsung/include"
+
 KBUILD_CFLAGS="-Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
 		   -fno-strict-aliasing -fno-common \
 		   -Werror-implicit-function-declaration \
 		   -Wno-format-security \
 		   -fno-delete-null-pointer-checks"
-CFLAGS_ABI="-mabi=aapcs-linux -mno-thumb-interwork -funwind-tables -D__LINUX_ARM_ARCH__=7 -march=armv7-a"
+
+#CFLAGS_ABI="-mabi=aapcs-linux -mno-thumb-interwork -funwind-tables -D__LINUX_ARM_ARCH__=7 -march=armv7-a"
+CFLAGS_ABI="-mabi=aapcs-linux -mno-thumb-interwork  -D__LINUX_ARM_ARCH__=7 -march=armv7-a"
 
 #for Sourcery_G++_Lite
-[ "${COMPILER_LIB/Sourcery/}" != "$COMPILER_LIB" ] && KBUILD_CFLAGS="$KBUILD_CFLAGS -mno-unaligned-access"
+#[ "${COMPILER_LIB/Sourcery/}" != "$COMPILER_LIB" ] && KBUILD_CFLAGS="$KBUILD_CFLAGS -mno-unaligned-access"
 #echo $KBUILD_CFLAGS
 
 #1. Image -> piggy.*
@@ -409,7 +414,7 @@ sed "s/TEXT_START/0/;s/BSS_START/ALIGN(4)/" < arch/arm/boot/compressed/vmlinux.l
 #8. head.o + misc.o + piggy.*.o --> vmlinux
 [ $llsl ] && ashldi3=" + ashldi3.o"
 printhl "head.o + misc.o + piggy.$compress_type.o + decompress.o + lib1funcs.o$ashldi3---> vmlinux"
-$COMPILER-ld -EL   --defsym zreladdr=0x40008000 --defsym params_phys=0x40000100 -p --no-undefined -X -T arch/arm/boot/compressed/vmlinux.lds arch/arm/boot/compressed/head.o arch/arm/boot/compressed/piggy.$compress_type.o arch/arm/boot/compressed/misc.o arch/arm/boot/compressed/decompress.o arch/arm/boot/compressed/lib1funcs.o $llsl -o arch/arm/boot/compressed/vmlinux
+$COMPILER-ld -EL   --defsym zreladdr=0x30008000 --defsym params_phys=0x30000100 -p --no-undefined -X -T arch/arm/boot/compressed/vmlinux.lds arch/arm/boot/compressed/head.o arch/arm/boot/compressed/piggy.$compress_type.o arch/arm/boot/compressed/misc.o arch/arm/boot/compressed/decompress.o arch/arm/boot/compressed/lib1funcs.o $llsl -o arch/arm/boot/compressed/vmlinux
 
 #9. vmlinux -> zImage
 printhl "vmlinux ---> zImage"
@@ -428,8 +433,11 @@ rm $new_zImage_name 2>/dev/null >/dev/null
 if [[ "${4/payload/}" != "$4" ]]; then
 	[[ "${4/ics/}" != "$4" ]] && ics="-ics"
 	printhl "Padding payload files to $(basename $new_zImage_name)"
-	mkbootoffset new_zImage arch/arm/boot/zImage boot$ics.tar.xz recovery$ics.tar.xz
-	#mkbootoffset new_zImage arch/arm/boot/zImage boot$ics.tar.xz
+	if [[ "${4/payloadb/}" != "$4" ]]; then	
+		mkbootoffset new_zImage arch/arm/boot/zImage boot$ics.tar.xz
+	else
+		mkbootoffset new_zImage arch/arm/boot/zImage boot$ics.tar.xz recovery$ics.tar.xz
+	fi
 	newzImagesize=$(stat -c "%s" new_zImage)
 	printhl "Now zImage size:$newzImagesize"
 	[ $newzImagesize -gt 8388608 ] && printerr "zImage too big..." && cleanup && exit 1

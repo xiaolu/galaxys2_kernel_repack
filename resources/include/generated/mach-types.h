@@ -2946,7 +2946,8 @@ extern unsigned int __machine_arch_type;
 #define MACH_TYPE_NETVIZ               2964
 #define MACH_TYPE_FLEXIBITY            2965
 #define MACH_TYPE_WLAN_COMPUTER        2966
-#define MACH_TYPE_C1                   2925
+#define MACH_TYPE_HERRING              3084
+#define MACH_TYPE_ARIES                2193
 
 #ifdef CONFIG_ARCH_EBSA110
 # ifdef machine_arch_type
@@ -38156,16 +38157,28 @@ extern unsigned int __machine_arch_type;
 # define machine_is_wlan_computer()	(0)
 #endif
 
-#ifdef CONFIG_MACH_C1
+#ifdef CONFIG_MACH_HERRING
 # ifdef machine_arch_type
 #  undef machine_arch_type
 #  define machine_arch_type	__machine_arch_type
 # else
-#  define machine_arch_type	MACH_TYPE_C1
+#  define machine_arch_type	MACH_TYPE_HERRING
 # endif
-# define machine_is_c1()	(machine_arch_type == MACH_TYPE_C1)
+# define machine_is_herring()	(machine_arch_type == MACH_TYPE_HERRING)
 #else
-# define machine_is_c1()	(0)
+# define machine_is_herring()	(0)
+#endif
+
+#ifdef CONFIG_MACH_ARIES
+# ifdef machine_arch_type
+#  undef machine_arch_type
+#  define machine_arch_type	__machine_arch_type
+# else
+#  define machine_arch_type	MACH_TYPE_ARIES
+# endif
+# define machine_is_aries()	(machine_arch_type == MACH_TYPE_ARIES)
+#else
+# define machine_is_aries()	(0)
 #endif
 
 /*
