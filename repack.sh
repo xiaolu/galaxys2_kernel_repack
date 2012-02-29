@@ -1,10 +1,10 @@
 #!/bin/bash
 ##############################################################################
 # you should point where your cross-compiler is         
-#COMPILER=/home/xiaolu/bin/android-toolchain-eabi/bin/arm-eabi
-#COMPILER_LIB=/home/xiaolu/bin/android-toolchain-eabi/lib/gcc/arm-eabi/4.5.4
-COMPILER=/home/xiaolu/CodeSourcery/Sourcery_G++_Lite/bin/arm-none-eabi
-COMPILER_LIB=/home/xiaolu/CodeSourcery/Sourcery_G++_Lite/lib/gcc/arm-none-eabi/4.5.2
+COMPILER=/home/xiaolu/bin/android-toolchain-eabi/bin/arm-eabi
+COMPILER_LIB=/home/xiaolu/bin/android-toolchain-eabi/lib/gcc/arm-eabi/4.5.4
+#COMPILER=/home/xiaolu/CodeSourcery/Sourcery_G++_Lite/bin/arm-none-eabi
+#COMPILER_LIB=/home/xiaolu/CodeSourcery/Sourcery_G++_Lite/lib/gcc/arm-none-eabi/4.5.2
 ##############################################################################
 #set -x
 
@@ -52,7 +52,7 @@ Usage:$0 <zImage> <initramfs> [new_zImage_name] [c_type or payload] [c_type]
 Error:Not enough parameters or file not found!
 
 Repack zImage,Example:
-	$0 zImagesys267 initramfs.cpio zImage
+	$0 zImagesy267 initramfs.cpio zImage
 
 Padding sufile to zImage offset=7000000,Example:
 	$0 zImagesy267 sy267.cpio new_zImage su
@@ -255,7 +255,7 @@ function mkbootoffset()
 #
 ###############################################################################
 
-printhl "---------------------------kernel repacker for i9100---------------------------"
+printhl "---------------------------kernel repacker for i9100G---------------------------"
 
 if [ -z $1 ] || [ -z $2 ] || [ ! -f $1 ] || [ ! -e $2 ]; then
 	exit_usage
@@ -344,9 +344,9 @@ cp $tempdir/new_Image arch/arm/boot/Image
 cp -f include/generated/autoconf.$compress_type.h include/generated/autoconf.h
 
 NOSTDINC_FLAGS="-nostdinc -isystem $COMPILER_LIB/include -Iarch/arm/include \
-		-Iinclude  -include include/generated/autoconf.h -D__KERNEL__ \
-		-mlittle-endian -Iarch/arm/mach-s5pv310/include \
-		-Iarch/arm/plat-s5p/include -Iarch/arm/plat-samsung/include"
+		-Iinclude  -include include/generated/autoconf.h \
+		-Isamsung/include -Isamsung/rfs_fsr/include -D__KERNEL__ \
+		-mlittle-endian -Iarch/arm/mach-omap2/include -Iarch/arm/plat-omap/include"
 KBUILD_CFLAGS="-Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
 		   -fno-strict-aliasing -fno-common \
 		   -Werror-implicit-function-declaration \
@@ -355,7 +355,7 @@ KBUILD_CFLAGS="-Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
 CFLAGS_ABI="-mabi=aapcs-linux -mno-thumb-interwork -funwind-tables -D__LINUX_ARM_ARCH__=7 -march=armv7-a"
 
 #for Sourcery_G++_Lite
-[ "${COMPILER_LIB/Sourcery/}" != "$COMPILER_LIB" ] && KBUILD_CFLAGS="$KBUILD_CFLAGS -mno-unaligned-access"
+#[ "${COMPILER_LIB/Sourcery/}" != "$COMPILER_LIB" ] && KBUILD_CFLAGS="$KBUILD_CFLAGS -mno-unaligned-access"
 #echo $KBUILD_CFLAGS
 
 #1. Image -> piggy.*
@@ -392,11 +392,11 @@ $COMPILER-gcc -Wp,-MD,arch/arm/boot/compressed/.head.o.d  $NOSTDINC_FLAGS -D__AS
 
 #4. misc.o
 printhl "Compiling misc.o"
-$COMPILER-gcc -Wp,-MD,arch/arm/boot/compressed/.misc.o.d  $NOSTDINC_FLAGS $KBUILD_CFLAGS -Os -marm -fno-omit-frame-pointer -mapcs -mno-sched-prolog $CFLAGS_ABI -msoft-float -Uarm -Wframe-larger-than=1024 -fno-stack-protector -fno-omit-frame-pointer -fno-optimize-sibling-calls -g -Wdeclaration-after-statement -Wno-pointer-sign -fno-strict-overflow -fconserve-stack -fpic -fno-builtin  $CFLAGS_KERNEL -D"KBUILD_STR(s)=\#s" -D"KBUILD_BASENAME=KBUILD_STR(misc)"  -D"KBUILD_MODNAME=KBUILD_STR(misc)"  -c -o arch/arm/boot/compressed/misc.o arch/arm/boot/compressed/misc.c 2>/dev/null >/dev/null
+$COMPILER-gcc -Wp,-MD,arch/arm/boot/compressed/.misc.o.d  $NOSTDINC_FLAGS $KBUILD_CFLAGS -Os -marm -fno-omit-frame-pointer -mapcs -mno-sched-prolog $CFLAGS_ABI -msoft-float -Uarm -include arch/arm/plat-omap/include/plat/mux_t1_rev_r07.h -D_SAMSUNG_BOARD_NAME=t1 -Wframe-larger-than=1024 -fno-stack-protector -fno-omit-frame-pointer -fno-optimize-sibling-calls -g -Wdeclaration-after-statement -Wno-pointer-sign -fno-strict-overflow -fconserve-stack -fpic -fno-builtin   -D"KBUILD_STR(s)=#s" -D"KBUILD_BASENAME=KBUILD_STR(misc)"  -D"KBUILD_MODNAME=KBUILD_STR(misc)"  -c -o arch/arm/boot/compressed/misc.o arch/arm/boot/compressed/misc.c
 
 #5. decompress.o
 printhl "Compiling decompress.o"
-$COMPILER-gcc -Wp,-MD,arch/arm/boot/compressed/.decompress.o.d  $NOSTDINC_FLAGS $KBUILD_CFLAGS -Os -marm -fno-omit-frame-pointer -mapcs -mno-sched-prolog $CFLAGS_ABI -msoft-float -Uarm -Wframe-larger-than=1024 -fno-stack-protector -fno-omit-frame-pointer -fno-optimize-sibling-calls -g -Wdeclaration-after-statement -Wno-pointer-sign -fno-strict-overflow -fconserve-stack -fpic -fno-builtin  $CFLAGS_KERNEL -D"KBUILD_STR(s)=\#s" -D"KBUILD_BASENAME=KBUILD_STR(decompress)"  -D"KBUILD_MODNAME=KBUILD_STR(decompress)"  -c -o arch/arm/boot/compressed/decompress.o arch/arm/boot/compressed/decompress.c
+$COMPILER-gcc -Wp,-MD,arch/arm/boot/compressed/.decompress.o.d  $NOSTDINC_FLAGS $KBUILD_CFLAGS -Os -marm -fno-omit-frame-pointer -mapcs -mno-sched-prolog $CFLAGS_ABI -msoft-float -Uarm -include arch/arm/plat-omap/include/plat/mux_t1_rev_r07.h -D_SAMSUNG_BOARD_NAME=t1 -Wframe-larger-than=1024 -fno-stack-protector -fno-omit-frame-pointer -fno-optimize-sibling-calls -g -Wdeclaration-after-statement -Wno-pointer-sign -fno-strict-overflow -fconserve-stack -fpic -fno-builtin   -D"KBUILD_STR(s)=#s" -D"KBUILD_BASENAME=KBUILD_STR(decompress)"  -D"KBUILD_MODNAME=KBUILD_STR(decompress)"  -c -o arch/arm/boot/compressed/decompress.o arch/arm/boot/compressed/decompress.c
 
 #6. lib1funcs.o
 printhl "Compiling lib1funcs.o"
@@ -409,7 +409,7 @@ sed "s/TEXT_START/0/;s/BSS_START/ALIGN(4)/" < arch/arm/boot/compressed/vmlinux.l
 #8. head.o + misc.o + piggy.*.o --> vmlinux
 [ $llsl ] && ashldi3=" + ashldi3.o"
 printhl "head.o + misc.o + piggy.$compress_type.o + decompress.o + lib1funcs.o$ashldi3---> vmlinux"
-$COMPILER-ld -EL   --defsym zreladdr=0x40008000 --defsym params_phys=0x40000100 -p --no-undefined -X -T arch/arm/boot/compressed/vmlinux.lds arch/arm/boot/compressed/head.o arch/arm/boot/compressed/piggy.$compress_type.o arch/arm/boot/compressed/misc.o arch/arm/boot/compressed/decompress.o arch/arm/boot/compressed/lib1funcs.o $llsl -o arch/arm/boot/compressed/vmlinux
+$COMPILER-ld -EL    --defsym zreladdr=0x80008000 --defsym initrd_phys=0x80800000 --defsym params_phys=0x80000100 -p --no-undefined -X -T arch/arm/boot/compressed/vmlinux.lds arch/arm/boot/compressed/head.o arch/arm/boot/compressed/piggy.$compress_type.o arch/arm/boot/compressed/misc.o arch/arm/boot/compressed/decompress.o arch/arm/boot/compressed/lib1funcs.o $llsl -o arch/arm/boot/compressed/vmlinux
 
 #9. vmlinux -> zImage
 printhl "vmlinux ---> zImage"
@@ -428,8 +428,12 @@ rm $new_zImage_name 2>/dev/null >/dev/null
 if [[ "${4/payload/}" != "$4" ]]; then
 	[[ "${4/ics/}" != "$4" ]] && ics="-ics"
 	printhl "Padding payload files to $(basename $new_zImage_name)"
-	mkbootoffset new_zImage arch/arm/boot/zImage boot$ics.tar.xz recovery$ics.tar.xz
-	#mkbootoffset new_zImage arch/arm/boot/zImage boot$ics.tar.xz
+	if [[ "${4/payloadb/}" != "$4" ]]; then	
+		mkbootoffset new_zImage arch/arm/boot/zImage boot$ics.tar.xz
+		#mkbootoffset new_zImage arch/arm/boot/zImage bootsy.tar
+	else
+		mkbootoffset new_zImage arch/arm/boot/zImage boot$ics.tar.xz recovery$ics.tar.xz
+	fi
 	newzImagesize=$(stat -c "%s" new_zImage)
 	printhl "Now zImage size:$newzImagesize"
 	[ $newzImagesize -gt 8388608 ] && printerr "zImage too big..." && cleanup && exit 1
