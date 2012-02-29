@@ -1,8 +1,8 @@
 #!/bin/bash
 ##############################################################################
 # you should point where your cross-compiler is         
-COMPILER=/home/xiaolu/bin/android-toolchain-eabi/bin/arm-eabi
-COMPILER_LIB=/home/xiaolu/bin/android-toolchain-eabi/lib/gcc/arm-eabi/4.5.4
+COMPILER=/home/xiaolu/CodeSourcery/arm-2009q3/bin/arm-none-eabi
+COMPILER_LIB=/home/xiaolu/CodeSourcery/arm-2009q3/lib/gcc/arm-none-eabi/4.4.1
 #COMPILER=/home/xiaolu/CodeSourcery/Sourcery_G++_Lite/bin/arm-none-eabi
 #COMPILER_LIB=/home/xiaolu/CodeSourcery/Sourcery_G++_Lite/lib/gcc/arm-none-eabi/4.5.2
 ##############################################################################
