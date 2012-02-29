@@ -428,8 +428,12 @@ rm $new_zImage_name 2>/dev/null >/dev/null
 if [[ "${4/payload/}" != "$4" ]]; then
 	[[ "${4/ics/}" != "$4" ]] && ics="-ics"
 	printhl "Padding payload files to $(basename $new_zImage_name)"
-	mkbootoffset new_zImage arch/arm/boot/zImage boot$ics.tar.xz recovery$ics.tar.xz
-	#mkbootoffset new_zImage arch/arm/boot/zImage boot$ics.tar.xz
+	if [[ "${4/payloadb/}" != "$4" ]]; then	
+		mkbootoffset new_zImage arch/arm/boot/zImage boot$ics.tar.xz
+		#mkbootoffset new_zImage arch/arm/boot/zImage bootsy.tar
+	else
+		mkbootoffset new_zImage arch/arm/boot/zImage boot$ics.tar.xz recovery$ics.tar.xz
+	fi
 	newzImagesize=$(stat -c "%s" new_zImage)
 	printhl "Now zImage size:$newzImagesize"
 	[ $newzImagesize -gt 8388608 ] && printerr "zImage too big..." && cleanup && exit 1
