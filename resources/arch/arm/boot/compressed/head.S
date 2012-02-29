@@ -175,9 +175,13 @@ not_angel:
  THUMB(		ldr	sp, [r0, #32]				)
 		subs	r0, r0, r1		@ calculate the delta offset
 
+#ifndef CONFIG_CRYPTO_FIPS
 						@ if delta is zero, we are
 		beq	not_relocated		@ running at the address we
 						@ were linked at.
+#else
+		beq	not_relocated_copy
+#endif
 
 		/*
 		 * We're running at a different address.  We need to fix
@@ -201,6 +205,9 @@ not_angel:
 		 */
 		add	r2, r2, r0
 		add	r3, r3, r0
+#ifdef CONFIG_CRYPTO_FIPS
+		bl	copy_compressed
+#endif
 		add	sp, sp, r0
 
 		/*
@@ -325,6 +332,32 @@ params:		ldr	r0, =params_phys
 		mov	pc, lr
 		.ltorg
 		.align
+#endif
+
+#ifdef CONFIG_CRYPTO_FIPS
+/* change@wtl.whenze FIPS integrity check
+Do copy for non-relocated image.  (Is this needed, image always relocated?) */
+not_relocated_copy:
+		bl copy_compressed
+		b not_relocated
+
+/* change@wtl.whenze FIPs integrity check
+copy compressed image + 32 bytes) to 0x60000000 */
+copy_compressed:
+		mov	r1, r5
+		mov	r9, #0x60000000
+
+1:
+		ldmia	r1!, {r10}
+		stmia	r9!, {r10}
+		cmp	r1, r3
+		blo	1b
+
+		.rept 8
+		ldmia	r1!, {r10}
+		stmia	r9!, {r10}
+		.endr
+		mov	pc, lr
 #endif
 
 /*
