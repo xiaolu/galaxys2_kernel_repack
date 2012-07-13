@@ -194,7 +194,7 @@
 #define S3C64XX_UINTSP		0x34
 #define S3C64XX_UINTM		0x38
 
-/* Following are specific to S5PV210 and S5P6442 */
+/* Following are specific to S5PV210 */
 #define S5PV210_UCON_CLKMASK	(1<<10)
 #define S5PV210_UCON_PCLK	(0<<10)
 #define S5PV210_UCON_UCLK	(1<<10)
@@ -224,9 +224,9 @@
 #define S5PV210_UFSTAT_RXMASK	(255<<0)
 #define S5PV210_UFSTAT_RXSHIFT	(0)
 
-#ifndef __ASSEMBLY__
+#define NO_NEED_CHECK_CLKSRC	1
 
-struct platform_device;
+#ifndef __ASSEMBLY__
 
 /* struct s3c24xx_uart_clksrc
  *
@@ -255,13 +255,15 @@ struct s3c24xx_uart_clksrc {
  * arch/arm/mach-s3c2410/ directory.
 */
 
+struct uart_port;
+
 struct s3c2410_uartcfg {
 	unsigned char	   hwport;	 /* hardware port number */
 	unsigned char	   unused;
 	unsigned short	   flags;
 	upf_t		   uart_flags;	 /* default uart flags */
 
-	unsigned int       has_fracval;
+	unsigned int	   has_fracval;
 
 	unsigned long	   ucon;	 /* value of ucon for port */
 	unsigned long	   ulcon;	 /* value of ulcon for port */
@@ -270,8 +272,8 @@ struct s3c2410_uartcfg {
 	struct s3c24xx_uart_clksrc *clocks;
 	unsigned int		    clocks_size;
 
-	void	(*cfg_gpio)(struct platform_device *dev);
 	void	(*wake_peer)(struct uart_port *);
+	void	(*set_runstate)(int onoff);
 };
 
 /* s3c24xx_uart_devs
@@ -280,9 +282,8 @@ struct s3c2410_uartcfg {
  * or platform_add_device() before the console_initcall()
 */
 
-extern struct platform_device *s3c24xx_uart_devs[CONFIG_SERIAL_SAMSUNG_UARTS];
+extern struct platform_device *s3c24xx_uart_devs[4];
 
 #endif /* __ASSEMBLY__ */
 
 #endif /* __ASM_ARM_REGS_SERIAL_H */
-
