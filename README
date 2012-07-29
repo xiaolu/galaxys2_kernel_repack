@@ -1,3 +1,27 @@
+= Galaxy S2 Kernel Packing/Repacking Tools =
+
+To unpack:
+        $ ./unpack.sh [original_zImage] [unpack_output_dir]
+
+Modify files in unpack output dir as necessary.
+
+To repack:
+
+   a) Generate ramfs output.cpio from unpack output dir:
+        $ ./gen_initramfs.sh -o [output.cpio] -u 0 -g 0 [unpack_output_dir]
+
+   b) Ensure your toolchain binaries are on your path
+
+   c) Set COMPILER_LIB environment variable to your toolchain gcc lib directory
+
+   d) Repack ramfs output.cpio and kernel from original zImage to new zImage
+        $ ./repack.sh [original_zImage] [output.cpio] [new_zImage]
+
+   e) Resize new zImage to size of original zImage
+        $ dd if=[new_zImage] of=[new_zImage_resized] bs=[original_zImage_size] conv=sync
+
+= Original Documentation =
+
 Please edit repack.sh:
 	# you should point where your cross-compiler is         
 	COMPILER=/home/xiaolu/bin/android-toolchain-eabi/bin/arm-eabi
