@@ -1,6 +1,7 @@
 #!/bin/bash
 # Copyright (C) Martin Schlemmer <azarah@nosferatu.za.org>
 # Copyright (C) 2006 Sam Ravnborg <sam@ravnborg.org>
+# Copyright (C) 2012 Josh Matthews <josh@brkawy.com>
 #
 # Released under the terms of the GNU GPL
 #
@@ -9,7 +10,7 @@
 # The script may also be used to generate the inputfile used for gen_init_cpio
 # This script assumes that gen_init_cpio is located in usr/ directory
 
-# error out on errors
+# Error out on errors.
 set -e
 
 # PLATFORM DETECTION
