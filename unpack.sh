@@ -26,6 +26,12 @@ if [[ "$OSTYPE" =~ ^darwin ]]; then
     # os x stat uses -f %z to get size
     STATSIZE='stat -f %z'
 
+    # Ensure we have gnucpio
+    if [ -z `which gnucpio` ]; then
+        echo "gnucpio is required, install via 'sudo port install cpio'" && exit 1
+    fi
+    CPIO=gnucpio
+
 else
 
     # TODO: defaults to Linux. We should detect other platforms.
@@ -34,6 +40,7 @@ else
     # standard gnu stat uses -c %s to get size
     STATSIZE='stat -c %s'
 
+    CPIO=cpio
 fi
 
 CURRENT_DIR=`pwd`
@@ -205,7 +212,7 @@ function expand_cpio_archive()
     if [ -e $TEMP_DIR/$INITRAMFS_FILE ]; then
         mkdir $INITRAMFS_DIR
         cd $INITRAMFS_DIR
-        cpio --quiet -i --make-directories --preserve-modification-time --no-absolute-filenames -F $TEMP_DIR/$INITRAMFS_FILE 2>/dev/null
+        $CPIO --quiet -i --make-directories --preserve-modification-time --no-absolute-filenames -F $TEMP_DIR/$INITRAMFS_FILE 2>/dev/null
     fi
 }
 
