@@ -12,6 +12,27 @@
 # error out on errors
 set -e
 
+# PLATFORM DETECTION
+# gen_init_cpio binary for each platform is in $PLATFORM directory
+if [[ "$OSTYPE" =~ ^darwin ]]; then
+    PLATFORM="darwin"
+
+    # Ensure we have gfind.
+    if [ -z `which gfind` ]; then
+        echo "gfind is required, install via 'sudo port install findutils'" && exit 1
+    fi
+    FIND=gfind
+
+    # os x stat uses -f %z to get size
+    STATSIZE='stat -f %z'
+
+else
+    # TODO: defaults to Linux. We should detect other platforms.
+    PLATFORM="linux"
+    FIND=find
+    STATSIZE='stat -c %s'
+fi
+
 usage() {
 cat << EOF
 Usage:
@@ -89,7 +110,7 @@ print_mtime() {
 	local my_mtime="0"
 
 	if [ -e "$1" ]; then
-		my_mtime=$(find "$1" -printf "%T@\n" | sort -r | head -n 1)
+		my_mtime=$($FIND "$1" -printf "%T@\n" | sort -r | head -n 1)
 	fi
 
 	echo "# Last modified: ${my_mtime}" >> ${output}
@@ -172,7 +193,7 @@ dir_filelist() {
 	${dep_list}header "$1"
 
 	srcdir=$(echo "$1" | sed -e 's://*:/:g')
-	dirlist=$(find "${srcdir}" -printf "%p %m %U %G\n")
+	dirlist=$($FIND "${srcdir}" -printf "%p %m %U %G\n")
 
 	# If $dirlist is only one line, then the directory is empty
 	if [  "$(echo "${dirlist}" | wc -l)" -gt 1 ]; then
@@ -287,7 +308,7 @@ done
 if [ ! -z ${output_file} ]; then
 	if [ -z ${cpio_file} ]; then
 		cpio_tfile="$(mktemp ${TMPDIR:-/tmp}/cpiofile.XXXXXX)"
-		./gen_init_cpio ${cpio_list} > ${cpio_tfile}
+		./$PLATFORM/gen_init_cpio ${cpio_list} > ${cpio_tfile}
 	else
 		cpio_tfile=${cpio_file}
 	fi
@@ -299,6 +320,6 @@ if [ ! -z ${output_file} ]; then
 		|| (rm -f ${output_file} ; false)
 	fi
 	[ -z ${cpio_file} ] && rm ${cpio_tfile}
-	echo $output_file filesize: $(stat -c "%s" $output_file)
+	echo $output_file filesize: $($STATSIZE $output_file)
 fi
 exit 0
