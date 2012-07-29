@@ -1,21 +1,66 @@
 #!/bin/bash
-##############################################################################
-# you should point where your cross-compiler is         
-COMPILER=/media/diskf/home/xiaolu/CyanogenGingerbread/prebuilt/linux-x86/toolchain/arm-eabi-4.4.3/bin/arm-eabi
-COMPILER_LIB=/media/diskf/home/xiaolu/CyanogenGingerbread/prebuilt/linux-x86/toolchain/arm-eabi-4.4.3/lib/gcc/arm-eabi/4.4.3
-#COMPILER=/home/xiaolu/CodeSourcery/Sourcery_G++_Lite/bin/arm-none-eabi
-#COMPILER_LIB=/home/xiaolu/CodeSourcery/Sourcery_G++_Lite/lib/gcc/arm-none-eabi/4.5.2
-#COMPILER=/home/xiaolu/CodeSourcery/arm-2009q3/bin/arm-none-eabi
-#COMPILER_LIB=/home/xiaolu/CodeSourcery/arm-2009q3/lib/gcc/arm-none-eabi/4.4.1
-##############################################################################
-#set -x
+
+# Before use, ensure:
+#  1. Your arm-eabi- binaries are on your PATH
+#  2. You export environment variable COMPILER_LIB to your toolchain gcc lib directory
+#     (e.g. {TOOLCHAIN}/lib/gcc/arm-eabi/4.4.3
 
 srcdir=`dirname $0`
-srcdir=`realpath -s $srcdir`
+
+COMPILER=arm-eabi
+
+# Ensure arm-eabi-gcc is on our PATH
+if [ -z `which $COMPILER-gcc` ]; then
+    echo "Ensure $COMPILER-* binaries are on your path" && exit 1
+fi
+
+# Ensure COMPILER_LIB env var is set
+if [ -z $COMPILER_LIB ]; then
+    echo "Set environment variable COMPILER_LIB to your toolchain gcc lib directory" && exit 1
+fi
+
+# PLATFORM DETECTION
+if [[ "$OSTYPE" =~ ^darwin ]]; then
+    PLATFORM="darwin"
+
+    # Ensure we have gmktemp.
+    if [ -z `which gmktemp` ]; then
+        echo "gmktemp is required, install via 'sudo port install coreutils'" && exit 1
+    fi
+    tempdir=$(gmktemp -d)
+
+    # Ensure we have greadlink.
+    if [ -z `which greadlink` ]; then
+        echo "greadlink is required, install via 'sudo port install coreutils'" && exit 1
+    fi
+    srcdir=`greadlink -f $srcdir`
+
+    # cut needs locale set to avoid "illegal byte sequence" error
+    export LC_ALL=C
+
+    # os x stat uses -f %z to get size
+    STATSIZE='stat -f %z'
+
+    # No arguments to dd.
+    DDARG=
+
+else
+    # TODO: defaults to Linux. We should detect other platforms.
+    PLATFORM="linux"
+
+    tempdir=$(mktemp -d)
+    srcdir=`realpath -s $srcdir`
+
+    # standard gnu stat uses -c %s to get size
+    STATSIZE='stat -c %s'
+
+    # dd arguments
+    DDARG="status=noxfer"
+fi
+
 RESOURCES=$srcdir/resources
 zImage="$1"
 new_ramdisk="$2"
-tempdir=$(mktemp -d)
 kernel="$tempdir/kernel.image"
 test_unzipped_cpio="$tempdir/cpio.image"
 head_image="$tempdir/head.image"
@@ -91,7 +136,7 @@ find_start_end()
 		cut -f 1 -d : | tail -1 | awk '(int($0)<50000){print $0;exit}'`
 	pos4=`grep -P -a -b --only-matching '\211\114\132' $zImage | \
 		head -2 |tail -1|cut -f 1 -d : | awk '(int($0)<50000){print $0;exit}'`
-	zImagesize=$(stat -c "%s" $zImage)
+	zImagesize=$($STATSIZE $zImage)
 	[ -z $pos1 ] && pos1=$zImagesize
 	[ -z $pos2 ] && pos2=$zImagesize
 	[ -z $pos3 ] && pos3=$zImagesize
@@ -202,7 +247,7 @@ find_start_end()
 
 function size_append()
 {
-	fsize=$(stat -c "%s" $1);
+	fsize=$($STATSIZE $1);
 	printf "%08x\n" $fsize |					\
 	sed 's/\(..\)/\1 /g' | {					\
 		read ch0 ch1 ch2 ch3;					\
@@ -215,7 +260,7 @@ function size_append()
 #Calculation file size, 512 bytes integer times 
 function count512()
 {
-	fsize=$(stat -c "%s" $1);
+	fsize=$($STATSIZE $1);
 	if [ $((fsize%512)) -ne 0 ]; then
 		fsize=$((fsize/512+1))
 	else
@@ -230,7 +275,6 @@ function append512()
 }
 function mkbootoffset()
 {
-	#tempdir=$(mktemp -d)
 	boot_offset=$(count512 $2)
 	append512 $2 $tempdir/zImage512 $boot_offset
 	boot_offset=$((boot_offset+1))
@@ -285,13 +329,13 @@ fi
 if [ -d $new_ramdisk ]; then
 	printhl "make initramfs.cpio"
 	cd $new_ramdisk
-	find | fakeroot cpio -H newc -o > $tempdir/initramfs.cpio 2>/dev/null
+	find . | fakeroot cpio -H newc -o > $tempdir/initramfs.cpio 2>/dev/null
 	new_ramdisk=$tempdir/initramfs.cpio
 	cd $workdir
 fi
 
 # Check the Image's size
-filesize=$(stat -c "%s" $kernel)
+filesize=$($STATSIZE $kernel)
 # Split the Image #1 ->  head.img
 printhl "Making head.img ( from 0 ~ $start )"
 dd if=$kernel bs=$start count=1 of=$head_image 2>/dev/null >/dev/null
@@ -303,7 +347,7 @@ dd if=$kernel bs=$headcount skip=1 of=$tail_image 2>/dev/null >/dev/null
 toobig="TRUE"
 for method in "cat" "$cpio_compress_type -f9"; do
 	cat $new_ramdisk | $method - > $ramdisk_image
-	ramdsize=$(stat -c "%s" $ramdisk_image)
+	ramdsize=$($STATSIZE $ramdisk_image)
 	printhl "Current ramdsize using $method : $ramdsize with required size : $count bytes"
 	if [ $ramdsize -le $count ]; then
 		printhl "$method accepted!"
@@ -319,13 +363,13 @@ fi
 
 #Merge head.img + ramdisk
 cat $head_image $ramdisk_image > $tempdir/franken.img
-franksize=$(stat -c "%s" $tempdir/franken.img)
+franksize=$($STATSIZE $tempdir/franken.img)
 
 #Merge head.img + ramdisk + padding + tail
 if [ $franksize -lt $headcount ]; then
 	printhl "Merging [head+ramdisk] + padding + tail"
 	tempnum=$((headcount - franksize))
-	dd status=noxfer if=/dev/zero bs=$tempnum count=1 of=$tempdir/padding 2>/dev/null >/dev/null
+	dd $DDARG if=/dev/zero bs=$tempnum count=1 of=$tempdir/padding 2>/dev/null >/dev/null
 	cat $tempdir/padding $tail_image > $tempdir/newtail.img
 	cat $tempdir/franken.img $tempdir/newtail.img > $tempdir/new_Image
 elif [ $franksize -eq $headcount ]; then
@@ -427,13 +471,13 @@ $COMPILER-ld -EL    --defsym zreladdr=0x40008000 -p --no-undefined -X -T arch/ar
 printhl "vmlinux ---> zImage"
 $COMPILER-objcopy -O binary -R .comment -S  arch/arm/boot/compressed/vmlinux arch/arm/boot/zImage
 
-newzImagesize=$(stat -c "%s" arch/arm/boot/zImage)
+newzImagesize=$($STATSIZE arch/arm/boot/zImage)
 printhl "Compiled new zImage size:$newzImagesize"
 
 #MAKE_FIPS
 MAKE_FIPS_BINARY arch/arm/boot/zImage
 
-newzImagesize=$(stat -c "%s" arch/arm/boot/zImage)
+newzImagesize=$($STATSIZE arch/arm/boot/zImage)
 printhl "MAKE_FIPS new zImage size:$newzImagesize"
 
 new_zImage_name="new_zImage"
@@ -449,7 +493,7 @@ if [[ "${4/payload/}" != "$4" ]]; then
 	else
 		mkbootoffset new_zImage arch/arm/boot/zImage boot.tar.xz recovery.tar.xz
 	fi
-	newzImagesize=$(stat -c "%s" new_zImage)
+	newzImagesize=$($STATSIZE new_zImage)
 	printhl "Now zImage size:$newzImagesize"
 	[ $newzImagesize -gt 8388608 ] && printerr "zImage too big..." && cleanup && exit 1
 	printhl "Padding new zImage to 8388608 bytes"
