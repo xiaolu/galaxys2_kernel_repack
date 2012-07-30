@@ -13,6 +13,8 @@
 # Error out on errors.
 set -e
 
+SCRIPT_DIR=$(dirname ${BASH_SOURCE[0]})
+
 # PLATFORM DETECTION
 # gen_init_cpio binary for each platform is in $PLATFORM directory
 if [[ "$OSTYPE" =~ ^darwin ]]; then
@@ -309,7 +311,7 @@ done
 if [ ! -z ${output_file} ]; then
 	if [ -z ${cpio_file} ]; then
 		cpio_tfile="$(mktemp ${TMPDIR:-/tmp}/cpiofile.XXXXXX)"
-		./$PLATFORM/gen_init_cpio ${cpio_list} > ${cpio_tfile}
+		$SCRIPT_DIR/$PLATFORM/gen_init_cpio ${cpio_list} > ${cpio_tfile}
 	else
 		cpio_tfile=${cpio_file}
 	fi
