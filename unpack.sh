@@ -5,7 +5,44 @@
 # The problem with that script is that the gzip magic number occasionally occur 
 # naturally, meaning that some non-compressed files get uncompressed.
 
-#GET CURRENT DIR
+# PLATFORM DETECTION
+
+if [[ "$OSTYPE" =~ ^darwin ]]; then
+    PLATFORM="darwin"
+
+    # Ensure we have a reasonable grep version. grep < 2.12 on OS X reports bad byte positions.
+    grep_ver_major_min="2"
+    grep_ver_minor_min="12"
+    grep_ver=$(grep -V | head -1 | tr " " "\n" | grep -P "[0-9]" | tr "." "\n")
+    grep_ver_major=$(echo "$grep_ver" | head -1)
+    grep_ver_minor=$(echo "$grep_ver" | head -2 | tail -1)
+    if [ "$grep_ver_major" -eq "$grep_ver_major_min" -a "$grep_ver_minor" -lt "$grep_ver_minor_min" -o "$grep_ver_major" -lt "$grep_ver_major_min" ]; then
+        echo "grep version < 2.15, upgrade via 'sudo port install grep'" && exit 1
+    fi
+
+    # cut needs locale set to avoid "illegal byte sequence" error
+    export LC_ALL=C
+
+    # os x stat uses -f %z to get size
+    STATSIZE='stat -f %z'
+
+    # Ensure we have gnucpio
+    if [ -z `which gnucpio` ]; then
+        echo "gnucpio is required, install via 'sudo port install cpio'" && exit 1
+    fi
+    CPIO=gnucpio
+
+else
+
+    # TODO: defaults to Linux. We should detect other platforms.
+    PLATFORM="linux"
+
+    # standard gnu stat uses -c %s to get size
+    STATSIZE='stat -c %s'
+
+    CPIO=cpio
+fi
+
 CURRENT_DIR=`pwd`
 TEMP_DIR=$CURRENT_DIR/unpack_kernel_tmp
 KERNEL_FILE=kernel
@@ -43,15 +80,16 @@ function unpack_kernel()
 {
     # test Compressed format
     pos1=`grep -P -a -b -m 1 --only-matching '\x1F\x8B\x08' $zImage | \
-	cut -f 1 -d : | awk '(int($0)<50000){print $0;exit}'`
+	cut -f 1 -d : 2>/dev/null | awk '(int($0)<50000){print $0;exit}'`
     pos2=`grep -P -a -b -m 1 --only-matching '\x{5D}\x{00}\x..\x{FF}\x{FF}\x{FF}\x{FF}\x{FF}\x{FF}' \
-	$zImage | cut -f 1 -d : | awk '(int($0)<50000){print $0;exit}'`
+	$zImage | cut -f 1 -d : 2>/dev/null | awk '(int($0)<50000){print $0;exit}'`
     pos3=`grep -P -a -b -m 1 --only-matching '\xFD\x37\x7A\x58\x5A' $zImage | \
-	cut -f 1 -d : | tail -1 | awk '(int($0)<50000){print $0;exit}'`
+	cut -f 1 -d : 2>/dev/null | tail -1 | awk '(int($0)<50000){print $0;exit}'`
     pos4=`grep -P -a -b --only-matching '\211\114\132' $zImage | head -2 | \
-	tail -1 | cut -f 1 -d : | awk '(int($0)<50000){print $0;exit}'`
+	tail -1 | cut -f 1 -d : 2>/dev/null | awk '(int($0)<50000){print $0;exit}'`
 
-    zImagesize=$(stat -c "%s" $zImage)
+    zImagesize=$($STATSIZE $zImage)
+
     [ -z $pos1 ] && pos1=$zImagesize
     [ -z $pos2 ] && pos2=$zImagesize
     [ -z $pos3 ] && pos3=$zImagesize
@@ -174,7 +212,7 @@ function expand_cpio_archive()
     if [ -e $TEMP_DIR/$INITRAMFS_FILE ]; then
         mkdir $INITRAMFS_DIR
         cd $INITRAMFS_DIR
-        cpio --quiet -i --make-directories --preserve-modification-time --no-absolute-filenames -F $TEMP_DIR/$INITRAMFS_FILE 2>/dev/null
+        $CPIO --quiet -i --make-directories --preserve-modification-time --no-absolute-filenames -F $TEMP_DIR/$INITRAMFS_FILE 2>/dev/null
     fi
 }
 
