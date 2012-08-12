@@ -1,13 +1,12 @@
 #!/bin/bash
-
-# Before use, ensure:
-#  1. Your arm-eabi- binaries are on your PATH
-#  2. You export environment variable COMPILER_LIB to your toolchain gcc lib directory
-#     (e.g. {TOOLCHAIN}/lib/gcc/arm-eabi/4.4.3
+##############################################################################
+# you should point where your cross-compiler is         
+COMPILER=/home/xiaolu/bin/arm-eabi-4.4.3/bin/arm-eabi
+COMPILER_LIB=/home/xiaolu/bin/arm-eabi-4.4.3/lib/gcc/arm-eabi/4.4.3
+##############################################################################
+#set -x
 
 srcdir=`dirname $0`
-
-COMPILER=arm-eabi
 
 # Ensure arm-eabi-gcc is on our PATH
 if [ -z `which $COMPILER-gcc` ]; then
@@ -297,11 +296,32 @@ function mkbootoffset()
 }
 MAKE_FIPS_BINARY()
 {
+	printhl "MAKE_FIPS for zImage."	
 	openssl dgst -sha256 -hmac 12345678 -binary -out \
 		$1.hmac $1
 	cat $1 $1.hmac > $1.digest
 	cp -f $1.digest $1
 	rm -f $1.digest $1.hmac
+}
+mkpayload()
+{
+	printhl "Make payload file(boot.tar.xz|recovery.tar.xz)."	
+	cd $tempdir/resources_tmp
+	rm boot.tar.xz recovery.tar.xz 2>/dev/null
+	if [ -d $1/boot ]; then
+		cd $1/boot
+		fakeroot tar -Jcf $tempdir/resources_tmp/boot.tar.xz *
+		cd $tempdir/resources_tmp
+	else
+		touch $tempdir/resources_tmp/boot.tar.xz
+	fi
+	if [ -d $1/recovery ]; then
+		cd $1/recovery
+		fakeroot tar -Jcf $tempdir/resources_tmp/recovery.tar.xz *
+		cd $tempdir/resources_tmp
+	else
+		touch $tempdir/resources_tmp/recovery.tar.xz
+	fi
 }
 ###############################################################################
 #
@@ -452,7 +472,7 @@ $COMPILER-gcc -Wp,-MD,arch/arm/boot/compressed/.misc.o.d  $NOSTDINC_FLAGS $KBUIL
 
 #5. decompress.o
 printhl "Compiling decompress.o"
-$COMPILER-gcc -Wp,-MD,arch/arm/boot/compressed/.decompress.o.d  $NOSTDINC_FLAGS $KBUILD_CFLAGS -O2 -fdiagnostics-show-option -Werror -Wno-error=unused-function -Wno-error=unused-variable -Wno-error=unused-value -Wno-error=unused-label -marm -fno-dwarf2-cfi-asm -fno-omit-frame-pointer -mapcs -mno-sched-prolog $CFLAGS_ABI -msoft-float -Uarm -Wframe-larger-than=1024 -fno-stack-protector -fno-omit-frame-pointer -fno-optimize-sibling-calls -g -Wdeclaration-after-statement -Wno-pointer-sign -fno-strict-overflow -fconserve-stack -fpic -fno-builtin  $CFLAGS_KERNEL -D"KBUILD_STR(s)=\#s" -D"KBUILD_BASENAME=KBUILD_STR(decompress)"  -D"KBUILD_MODNAME=KBUILD_STR(decompress)" -c -o arch/arm/boot/compressed/decompress.o arch/arm/boot/compressed/decompress.c
+$COMPILER-gcc -Wp,-MD,arch/arm/boot/compressed/.decompress.o.d  $NOSTDINC_FLAGS $KBUILD_CFLAGS -O2 -fdiagnostics-show-option -Werror -Wno-error=unused-function -Wno-error=unused-variable -Wno-unused-but-set-variable -Wno-error=unused-value -Wno-error=unused-label -marm -fno-dwarf2-cfi-asm -fno-omit-frame-pointer -mapcs -mno-sched-prolog $CFLAGS_ABI -msoft-float -Uarm -Wframe-larger-than=1024 -fno-stack-protector -fno-omit-frame-pointer -fno-optimize-sibling-calls -g -Wdeclaration-after-statement -Wno-pointer-sign -fno-strict-overflow -fconserve-stack -fpic -fno-builtin  $CFLAGS_KERNEL -D"KBUILD_STR(s)=\#s" -D"KBUILD_BASENAME=KBUILD_STR(decompress)"  -D"KBUILD_MODNAME=KBUILD_STR(decompress)" -c -o arch/arm/boot/compressed/decompress.o arch/arm/boot/compressed/decompress.c
 
 #6. lib1funcs.o
 printhl "Compiling lib1funcs.o"
@@ -477,9 +497,6 @@ printhl "Compiled new zImage size:$newzImagesize"
 #MAKE_FIPS
 MAKE_FIPS_BINARY arch/arm/boot/zImage
 
-newzImagesize=$($STATSIZE arch/arm/boot/zImage)
-printhl "MAKE_FIPS new zImage size:$newzImagesize"
-
 new_zImage_name="new_zImage"
 [ $3 ] && new_zImage_name=$3
 if [ ${new_zImage_name:0:1} != "/" ]; then
@@ -487,28 +504,29 @@ if [ ${new_zImage_name:0:1} != "/" ]; then
 fi
 rm $new_zImage_name 2>/dev/null >/dev/null
 if [[ "${4/payload/}" != "$4" ]]; then
-	printhl "Padding payload files to $(basename $new_zImage_name)"
+	mkpayload ./payload
+	printhl "Padding payload files to $(basename $new_zImage_name)."
 	if [[ "${4/payloadb/}" != "$4" ]]; then	
 		mkbootoffset new_zImage arch/arm/boot/zImage boot.tar.xz
 	else
 		mkbootoffset new_zImage arch/arm/boot/zImage boot.tar.xz recovery.tar.xz
 	fi
 	newzImagesize=$($STATSIZE new_zImage)
-	printhl "Now zImage size:$newzImagesize"
+	printhl "Now zImage size:$newzImagesize bytes"
 	[ $newzImagesize -gt 8388608 ] && printerr "zImage too big..." && cleanup && exit 1
-	printhl "Padding new zImage to 8388608 bytes"
+	printhl "Padding new zImage to 8388608 bytes."
 	dd if=new_zImage of=$new_zImage_name bs=8388608 conv=sync 2>/dev/null >/dev/null
 elif [[ "${4/su/}" != "$4" ]]; then
-	printhl "Padding sufiles to $new_zImage_name"
+	printhl "Padding sufiles to $new_zImage_name."
 	dd if=arch/arm/boot/zImage of=$new_zImage_name bs=8388608 conv=sync 2>/dev/null >/dev/null
 	dd if=sufile.pad of=$new_zImage_name bs=1 count=222976 seek=7000000 conv=notrunc 2>/dev/null >/dev/null
 elif [[ "${4/pad/}" != "$4" ]]; then
-	printhl "Padding new zImage to 8388608 bytes"
+	printhl "Padding new zImage to 8388608 bytes."
 	dd if=arch/arm/boot/zImage of=$new_zImage_name bs=8388608 conv=sync 2>/dev/null >/dev/null
 else
 	cp -f arch/arm/boot/zImage $new_zImage_name
 fi
 
-printhl "$(basename $new_zImage_name) has been created"
+printhl "$(basename $new_zImage_name) has been created."
 cd $workdir
 cleanup

@@ -995,6 +995,7 @@ extern unsigned int __machine_arch_type;
 #define MACH_TYPE_NURI                 3379
 #define MACH_TYPE_JANUS                3380
 #define MACH_TYPE_DDNAS                3381
+#define MACH_TYPE_U1HD                 3381
 #define MACH_TYPE_TAG                  3382
 #define MACH_TYPE_TAGW                 3383
 #define MACH_TYPE_NITROGEN_VM_IMX51    3384
@@ -1110,6 +1111,8 @@ extern unsigned int __machine_arch_type;
 #define MACH_TYPE_SLP_PQ_LTE           3767
 #define MACH_TYPE_SMDK5210             3774
 #define MACH_TYPE_SMDK5250             3825
+#define MACH_TYPE_TRATS                3928
+#define MACH_TYPE_REDWOOD              3768
 
 #ifdef CONFIG_ARCH_EBSA110
 # ifdef machine_arch_type
@@ -12907,6 +12910,18 @@ extern unsigned int __machine_arch_type;
 # define machine_is_ddnas()	(0)
 #endif
 
+#ifdef CONFIG_MACH_U1HD
+# ifdef machine_arch_type
+#  undef machine_arch_type
+#  define machine_arch_type	__machine_arch_type
+# else
+#  define machine_arch_type	MACH_TYPE_U1HD
+# endif
+# define machine_is_u1hd()	(machine_arch_type == MACH_TYPE_U1HD)
+#else
+# define machine_is_u1hd()	(0)
+#endif
+
 #ifdef CONFIG_MACH_TAG
 # ifdef machine_arch_type
 #  undef machine_arch_type
@@ -14285,6 +14300,30 @@ extern unsigned int __machine_arch_type;
 # define machine_is_smdk5250()	(machine_arch_type == MACH_TYPE_SMDK5250)
 #else
 # define machine_is_smdk5250()	(0)
+#endif
+
+#ifdef CONFIG_MACH_TRATS
+# ifdef machine_arch_type
+#  undef machine_arch_type
+#  define machine_arch_type	__machine_arch_type
+# else
+#  define machine_arch_type	MACH_TYPE_TRATS
+# endif
+# define machine_is_trats()	(machine_arch_type == MACH_TYPE_TRATS)
+#else
+# define machine_is_trats()	(0)
+#endif
+
+#ifdef CONFIG_MACH_REDWOOD
+# ifdef machine_arch_type
+#  undef machine_arch_type
+#  define machine_arch_type	__machine_arch_type
+# else
+#  define machine_arch_type	MACH_TYPE_REDWOOD
+# endif
+# define machine_is_redwood()	(machine_arch_type == MACH_TYPE_REDWOOD)
+#else
+# define machine_is_redwood()	(0)
 #endif
 
 /*
