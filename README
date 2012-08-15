@@ -47,7 +47,7 @@ Use tar.xz In the end of the new_zImage:
 	./repack.sh zImagesy262 initramfs.cpio new_zImage payload
 
 	how to use,pls read initramfs-sample/sbin/script/post-init.sh & recovery.sh
-	recovery.tar.xz and boot.tar.xz in resources directory£¬you can customize.
+	recovery.tar.xz and boot.tar.xz in resources directoryï¼Œyou can customize.
 	In recovery.sh:
 	cd /
 	eval $(read_boot_headers /dev/block/mmcblk0p5)
@@ -61,40 +61,40 @@ Custom zImage compression type:
 	or
 	./repack.sh zImagesy267 initramfs.cpio new_zImage payload gzip
 
-ÖĞÎÄ°æ£º
-ĞŞ¸Ärepack.sh¿ªÍ·µÄ±àÒëÆ÷Â·¾¶ºÍ¿âÎÄ¼şÂ·¾¶£¬¸ÄÎªÄã×Ô¼ºµÄ£º
+ä¸­æ–‡ç‰ˆï¼š
+ä¿®æ”¹repack.shå¼€å¤´çš„ç¼–è¯‘å™¨è·¯å¾„å’Œåº“æ–‡ä»¶è·¯å¾„ï¼Œæ”¹ä¸ºä½ è‡ªå·±çš„ï¼š
 	COMPILER=/home/xiaolu/bin/android-toolchain-eabi/bin/arm-eabi
 	COMPILER_LIB=/home/xiaolu/bin/android-toolchain-eabi/lib/gcc/arm-eabi/4.5.4
 	
-½â°üzImage£¬ÀıÈç£º
+è§£åŒ…zImageï¼Œä¾‹å¦‚ï¼š
 	./unpack.sh zImagesy267 sy267
 	
-ÖØĞÂ´ò°ü±àÒëzImage£º
-	¸ñÊ½£º
-	./repack.sh Ô­Ê¼zImage initramfs(Ä¿Â¼»òÕßcpioÎÄ¼ş) ĞÂzImageÃû
-	ÀıÈç£º
+é‡æ–°æ‰“åŒ…ç¼–è¯‘zImageï¼š
+	æ ¼å¼ï¼š
+	./repack.sh åŸå§‹zImage initramfs(ç›®å½•æˆ–è€…cpioæ–‡ä»¶) æ–°zImageå
+	ä¾‹å¦‚ï¼š
 	./repack.sh zImagesy267 initramfs.cpio new_zImage
 	or
 	./repack.sh zImagesy267 sy267 new_zImage
 	
-	¶ÔÓÚ³¬³ö´óĞ¡µÄinitramfs£¬¿ÉÒÔÊ¹ÓÃÏÂ±ßÁ½ÖÖ°ì·¨À´´ò°ü£º
-	1.°Ñ2½øÖÆµÄsuÎÄ¼şºÍSuperuser.apkÎÄ¼ş·ÅÔÚĞÂzImageµÄ7000000×Ö½ÚÆ«ÒÆ´¦£¬ÃüÁî£º
+	å¯¹äºè¶…å‡ºå¤§å°çš„initramfsï¼Œå¯ä»¥ä½¿ç”¨ä¸‹è¾¹ä¸¤ç§åŠæ³•æ¥æ‰“åŒ…ï¼š
+	1.æŠŠ2è¿›åˆ¶çš„suæ–‡ä»¶å’ŒSuperuser.apkæ–‡ä»¶æ”¾åœ¨æ–°zImageçš„7000000å­—èŠ‚åç§»å¤„ï¼Œå‘½ä»¤ï¼š
 	./repack.sh zImagesm189 sm189.cpio new_zImage su
-	ÈçºÎÔÚÆô¶¯µÄÊ±ºòµ÷ÓÃsuºÍSuperuser.apk£¬ÇëÔÚroot½Å±¾ÀïÌí¼ÓÈçÏÂ:
+	å¦‚ä½•åœ¨å¯åŠ¨çš„æ—¶å€™è°ƒç”¨suå’ŒSuperuser.apkï¼Œè¯·åœ¨rootè„šæœ¬é‡Œæ·»åŠ å¦‚ä¸‹:
 	dd if=/dev/block/mmcblk0p5 of=/system/bin/su skip=7000000 seek=0 bs=1 count=26336
 	dd if=/dev/block/mmcblk0p5 of=/system/app/Superuser.apk skip=7026336 seek=0 bs=1 count=196640
 	
-	2.Ê¹ÓÃ°ÑÒ»Ğ©´óÎÄ¼ş´ò°ü³Étar.xz·ÅÔÚzImageÄ©Î²£¬Æô¶¯ĞèÒªÓÃµ½µÄÊ±ºò¶ÁÈ¡Ñ¹Ëõ°üÆ«ÒÆÁ¿£¬ÓÃDD¸´ÖÆ³öÀ´½âÑ¹µ½rootfsÏàÓ¦Î»ÖÃ¡£
+	2.ä½¿ç”¨æŠŠä¸€äº›å¤§æ–‡ä»¶æ‰“åŒ…æˆtar.xzæ”¾åœ¨zImageæœ«å°¾ï¼Œå¯åŠ¨éœ€è¦ç”¨åˆ°çš„æ—¶å€™è¯»å–å‹ç¼©åŒ…åç§»é‡ï¼Œç”¨DDå¤åˆ¶å‡ºæ¥è§£å‹åˆ°rootfsç›¸åº”ä½ç½®ã€‚
 	./repack.sh zImagesy262 initramfs.cpio new_zImage payload
-	ÉÏ±ßµÄÃüÁîÊÇ´ò°üµÄÍ¬Ê±°Ñrecovery.tar.xzºÍboot.tar.xz·ÅÔÚzImageÄ©Î²£¬ÏÂ±ßËµÒ»ÏÂÈçºÎÊ¹ÓÃ£¬ÒÔÆô¶¯recovery(recovery.sh)ÎªÀı×Ó£º
+	ä¸Šè¾¹çš„å‘½ä»¤æ˜¯æ‰“åŒ…çš„åŒæ—¶æŠŠrecovery.tar.xzå’Œboot.tar.xzæ”¾åœ¨zImageæœ«å°¾ï¼Œä¸‹è¾¹è¯´ä¸€ä¸‹å¦‚ä½•ä½¿ç”¨ï¼Œä»¥å¯åŠ¨recovery(recovery.sh)ä¸ºä¾‹å­ï¼š
 	cd /
 	eval $(read_boot_headers /dev/block/mmcblk0p5)
 	load_offset=$recovery_offset
 	load_len=$recovery_len
 	dd bs=512 if=/dev/block/mmcblk0p5 skip=$load_offset count=$load_len | xzcat | tar x
 	
-	×Ô¶¨ÒåzImageÑ¹ËõÀàĞÍ£º
+	è‡ªå®šä¹‰zImageå‹ç¼©ç±»å‹ï¼š
 	./repack.sh zImagesy267 initramfs.cpio new_zImage gzip
-	»òÕß
+	æˆ–è€…
 	./repack.sh zImagesy267 initramfs.cpio new_zImage payload gzip
 	

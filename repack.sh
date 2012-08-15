@@ -9,17 +9,6 @@ COMPILER_LIB=e:/tools/cygwin/toolchains/arm-linux-androideabi-4.4.3/lib/gcc/arm-
 #set -x
 
 srcdir=`dirname $0`
-
-# Ensure arm-eabi-gcc is on our PATH
-if [ -z `which $COMPILER-gcc` ]; then
-    echo "Ensure $COMPILER-* binaries are on your path" && exit 1
-fi
-
-# Ensure COMPILER_LIB env var is set
-if [ -z $COMPILER_LIB ]; then
-    echo "Set environment variable COMPILER_LIB to your toolchain gcc lib directory" && exit 1
-fi
-
 # PLATFORM DETECTION
 if [[ "$OSTYPE" =~ ^darwin ]]; then
     PLATFORM="darwin"
@@ -336,7 +325,10 @@ mkpayload()
 ###############################################################################
 
 printhl "---------------------------kernel repacker for i9100---------------------------"
-
+if [ ! -e $COMPILER-gcc ] || [ ! -e $COMPILER_LIB ]; then
+	printerr "compiler not found!";
+	exit 1;
+fi
 if [ -z $1 ] || [ -z $2 ] || [ ! -f $1 ] || [ ! -e $2 ]; then
 	exit_usage
 fi
