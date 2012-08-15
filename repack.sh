@@ -1,8 +1,10 @@
 #!/bin/bash
 ##############################################################################
 # you should point where your cross-compiler is         
-COMPILER=/home/xiaolu/bin/arm-eabi-4.4.3/bin/arm-eabi
-COMPILER_LIB=/home/xiaolu/bin/arm-eabi-4.4.3/lib/gcc/arm-eabi/4.4.3
+#COMPILER=/home/xiaolu/bin/arm-eabi-4.4.3/bin/arm-eabi
+#COMPILER_LIB=/home/xiaolu/bin/arm-eabi-4.4.3/lib/gcc/arm-eabi/4.4.3
+COMPILER=e:/tools/cygwin/toolchains/arm-linux-androideabi-4.4.3/bin/arm-linux-androideabi
+COMPILER_LIB=e:/tools/cygwin/toolchains/arm-linux-androideabi-4.4.3/lib/gcc/arm-linux-androideabi/4.4.3
 ##############################################################################
 #set -x
 
@@ -72,7 +74,7 @@ C_ERR="\033[1;31m"
 C_CLEAR="\033[0;0m"
 
 printhl() {
-	printf "${C_H1}${1}${C_CLEAR} \n"
+	printf "${C_H1}[$(basename $0)]${1}${C_CLEAR} \n"
 }
 
 printerr() {
@@ -152,7 +154,8 @@ find_start_end()
 	elif [ $minpos -eq $pos2 ]; then
 		printhl "Extracting lzma'd kernel from $zImage (start = $pos2)"
 		dd if=$zImage of="$kernel.lzma" bs=$pos2 skip=1 2>/dev/null >/dev/null
-		unlzma -qf "$kernel.lzma"
+		#unlzma -qf "$kernel.lzma"
+		unlzma -dqc $kernel.lzma > $kernel 2>/dev/null
 		compress_type="lzma"
 	elif [ $minpos -eq $pos3 ]; then
 		printhl "Extracting xz'd kernel from $zImage (start = $pos3)"
@@ -221,7 +224,7 @@ find_start_end()
 	start=$cpio_compressed_start
 	dd if=$kernel of=$test_unzipped_cpio bs=$cpio_compressed_start skip=1 2>/dev/null >/dev/null
 	if [ ! $compression_name = "none" ]; then
-		printhl "CPIO compression type detected = $compression_name | offset = $cpio_compressed_start"
+		printhl "CPIO compression type detected = $compression_name | offset = $cpio_compressed_start."
 		end_zero='[\x01-\xff]\x00{8}'
 		#end_zero='\x00{16}[\x01-\xff]'
 		end=`grep -P -a -b -m 1 -o $end_zero $test_unzipped_cpio | cut -f 1 -d : | head -1`
@@ -230,7 +233,7 @@ find_start_end()
 		#end=$((end - end%16))
 		cpio_compress_type=$compression_name
 	else
-        	printhl "Non-compressed CPIO image from kernel image (offset = $cpio_compressed_start)"
+        	printhl "Non-compressed CPIO image from kernel image (offset = $cpio_compressed_start)."
 		start_zero='0707010{39}10{55}B0{8}TRAILER!!!'
 		end1=`grep -P -a -b -m 1 -o $start_zero $test_unzipped_cpio | head -1 | cut -f 1 -d :`
 		end1=$((end1 + 120))
@@ -311,18 +314,20 @@ mkpayload()
 	rm boot.tar.xz recovery.tar.xz 2>/dev/null
 	if [ -d $1/boot ]; then
 		cd $1/boot
-		fakeroot tar -Jcf $tempdir/resources_tmp/boot.tar.xz *
-		cd $tempdir/resources_tmp
+		#fakeroot tar -Jcf $tempdir/resources_tmp/boot.tar.xz *
+		tar --owner=root --group=root -acf $tempdir/resources_tmp/boot.tar.xz *
 	else
 		touch $tempdir/resources_tmp/boot.tar.xz
 	fi
+	cd $tempdir/resources_tmp
 	if [ -d $1/recovery ]; then
 		cd $1/recovery
-		fakeroot tar -Jcf $tempdir/resources_tmp/recovery.tar.xz *
-		cd $tempdir/resources_tmp
+		#fakeroot tar -Jcf $tempdir/resources_tmp/recovery.tar.xz *
+		tar --owner=root --group=root -acf $tempdir/resources_tmp/recovery.tar.xz *
 	else
 		touch $tempdir/resources_tmp/recovery.tar.xz
 	fi
+	cd $tempdir/resources_tmp
 }
 ###############################################################################
 #
@@ -350,7 +355,9 @@ fi
 if [ -d $new_ramdisk ]; then
 	printhl "make initramfs.cpio"
 	cd $new_ramdisk
-	find . | fakeroot cpio -H newc -o > $tempdir/initramfs.cpio 2>/dev/null
+	#find . | fakeroot cpio -H newc -o > $tempdir/initramfs.cpio 2>/dev/null
+	find . | cpio -R root:root -H newc -o > $tempdir/initramfs.cpio 2>/dev/null
+	#mkbootfs $new_ramdisk > $tempdir/initramfs.cpio
 	new_ramdisk=$tempdir/initramfs.cpio
 	cd $workdir
 fi
@@ -513,7 +520,7 @@ if [[ "${4/payload/}" != "$4" ]]; then
 		mkbootoffset new_zImage arch/arm/boot/zImage boot.tar.xz recovery.tar.xz
 	fi
 	newzImagesize=$($STATSIZE new_zImage)
-	printhl "Now zImage size:$newzImagesize bytes"
+	printhl "Now zImage size:$newzImagesize bytes."
 	[ $newzImagesize -gt 8388608 ] && printerr "zImage too big..." && cleanup && exit 1
 	printhl "Padding new zImage to 8388608 bytes."
 	dd if=new_zImage of=$new_zImage_name bs=8388608 conv=sync 2>/dev/null >/dev/null

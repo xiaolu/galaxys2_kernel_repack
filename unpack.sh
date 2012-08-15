@@ -121,7 +121,8 @@ function unlzma_kernel()
 {
     printhl "Extracting lzma'd kernel image from file: $zImage (start = $pos2)"
     dd if=$zImage of=$TEMP_DIR/$KERNEL_LZMA_FILE bs=$pos2 skip=1 2>/dev/null >/dev/null
-    unlzma -qf $TEMP_DIR/$KERNEL_LZMA_FILE
+	#unlzma -qf $TEMP_DIR/$KERNEL_GZIP_FILE
+    unlzma -dqc $TEMP_DIR/$KERNEL_LZMA_FILE > $TEMP_DIR/$KERNEL_FILE 2>/dev/null
 }
 
 function unxz_kernel()
@@ -184,7 +185,7 @@ function search_cpio()
                 compression_signature=$csig
                 uncompress_cmd=$ucmd
                 file_ext=$fext
-		break	
+				break	
             fi
         fi
     done 
