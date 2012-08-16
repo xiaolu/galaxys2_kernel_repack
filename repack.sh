@@ -348,7 +348,7 @@ if [ -d $new_ramdisk ]; then
 	printhl "make initramfs.cpio"
 	cd $new_ramdisk
 	#find . | fakeroot cpio -H newc -o > $tempdir/initramfs.cpio 2>/dev/null
-	find . | cpio -R root:root -H newc -o > $tempdir/initramfs.cpio 2>/dev/null
+	find . | cpio -R 0:0 -H newc -o > $tempdir/initramfs.cpio 2>/dev/null
 	#mkbootfs $new_ramdisk > $tempdir/initramfs.cpio
 	new_ramdisk=$tempdir/initramfs.cpio
 	cd $workdir
