@@ -71,18 +71,18 @@
 <p>Padding sufile to new_zImage offset=7000000,Example:
     ./repack.sh zImagesm189 sm189.cpio new_zImage su</p>
 
-<pre><code>post-int.sh(init.rc services):
-dd if=/dev/block/mmcblk0p5 of=/system/bin/su skip=7000000 seek=0 bs=1 count=26336
+post-int.sh(init.rc services):
+<pre><code>dd if=/dev/block/mmcblk0p5 of=/system/bin/su skip=7000000 seek=0 bs=1 count=26336
 dd if=/dev/block/mmcblk0p5 of=/system/app/Superuser.apk skip=7026336 seek=0 bs=1 count=196640
 </code></pre>
 
 <p>Use tar.xz In the end of the new_zImage:
     ./repack.sh zImagesy262 initramfs.cpio new_zImage payload</p>
 
-<pre><code>how to use,pls read initramfs-sample/sbin/script/post-init.sh &amp; recovery.sh
+how to use,pls read initramfs-sample/sbin/script/post-init.sh &amp; recovery.sh
 recovery.tar.xz and boot.tar.xz in resources directory，you can customize.
 In recovery.sh:
-cd /
+<pre><code>cd /
 eval $(read_boot_headers /dev/block/mmcblk0p5)
 load_offset=$recovery_offset
 load_len=$recovery_len
@@ -110,27 +110,26 @@ dd bs=512 if=/dev/block/mmcblk0p5 skip=$load_offset count=$load_len | xzcat | ta
     or
     ./repack.sh zImagesy267 sy267 new_zImage</p>
 
-<pre><code>对于超出大小的initramfs，可以使用下边两种办法来打包：
+<p>对于超出大小的initramfs，可以使用下边两种办法来打包：
 1.把2进制的su文件和Superuser.apk文件放在新zImage的7000000字节偏移处，命令：
 ./repack.sh zImagesm189 sm189.cpio new_zImage su
-如何在启动的时候调用su和Superuser.apk，请在root脚本里添加如下:
-dd if=/dev/block/mmcblk0p5 of=/system/bin/su skip=7000000 seek=0 bs=1 count=26336
-dd if=/dev/block/mmcblk0p5 of=/system/app/Superuser.apk skip=7026336 seek=0 bs=1 count=196640
+如何在启动的时候调用su和Superuser.apk，请在root脚本里添加如下:</p>
+<pre><code>dd if=/dev/block/mmcblk0p5 of=/system/bin/su skip=7000000 seek=0 bs=1 count=26336
+dd if=/dev/block/mmcblk0p5 of=/system/app/Superuser.apk skip=7026336 seek=0 bs=1 count=196640</pre></code>
 
-2.使用把一些大文件打包成tar.xz放在zImage末尾，启动需要用到的时候读取压缩包偏移量，用DD复制出来解压到rootfs相应位置。
+<p>2.使用把一些大文件打包成tar.xz放在zImage末尾，启动需要用到的时候读取压缩包偏移量，用DD复制出来解压到rootfs相应位置。
 ./repack.sh zImagesy262 initramfs.cpio new_zImage payload
-上边的命令是打包的同时把recovery.tar.xz和boot.tar.xz放在zImage末尾，下边说一下如何使用，以启动recovery(recovery.sh)为例子：
-cd /
+上边的命令是打包的同时把recovery.tar.xz和boot.tar.xz放在zImage末尾，下边说一下如何使用，以启动recovery(recovery.sh)为例子：</p>
+<pre><code>cd /
 eval $(read_boot_headers /dev/block/mmcblk0p5)
 load_offset=$recovery_offset
 load_len=$recovery_len
-dd bs=512 if=/dev/block/mmcblk0p5 skip=$load_offset count=$load_len | xzcat | tar x
+dd bs=512 if=/dev/block/mmcblk0p5 skip=$load_offset count=$load_len | xzcat | tar x</pre></code>
 
-自定义zImage压缩类型：
+<p>自定义zImage压缩类型：
 ./repack.sh zImagesy267 initramfs.cpio new_zImage gzip
 或者
-./repack.sh zImagesy267 initramfs.cpio new_zImage payload gzip
-</code></pre>
+./repack.sh zImagesy267 initramfs.cpio new_zImage payload gzip</p>
         </section>
 
         <footer>
