@@ -185,7 +185,7 @@ function search_cpio()
                 compression_signature=$csig
                 uncompress_cmd=$ucmd
                 file_ext=$fext
-				break	
+				#break	
             fi
         fi
     done 

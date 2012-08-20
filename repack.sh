@@ -204,7 +204,7 @@ find_start_end()
 				compression_signature=$csig
 				uncompress_cmd=$ucmd
 				file_ext=$fext
-				break
+				#break
 			fi
 		fi
 	done 
@@ -304,7 +304,7 @@ mkpayload()
 	if [ -d $1/boot ]; then
 		cd $1/boot
 		#fakeroot tar -Jcf $tempdir/resources_tmp/boot.tar.xz *
-		tar --owner=root --group=root -acf $tempdir/resources_tmp/boot.tar.xz *
+		tar --owner=0 --group=0 -acf $tempdir/resources_tmp/boot.tar.xz *
 	else
 		touch $tempdir/resources_tmp/boot.tar.xz
 	fi
@@ -346,10 +346,10 @@ fi
 
 if [ -d $new_ramdisk ]; then
 	printhl "make initramfs.cpio"
+	#mkbootfs $new_ramdisk > $tempdir/initramfs.cpio
 	cd $new_ramdisk
 	#find . | fakeroot cpio -H newc -o > $tempdir/initramfs.cpio 2>/dev/null
 	find . | cpio -R 0:0 -H newc -o > $tempdir/initramfs.cpio 2>/dev/null
-	#mkbootfs $new_ramdisk > $tempdir/initramfs.cpio
 	new_ramdisk=$tempdir/initramfs.cpio
 	cd $workdir
 fi
