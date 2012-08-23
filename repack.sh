@@ -1,10 +1,10 @@
 #!/bin/bash
 ##############################################################################
 # you should point where your cross-compiler is         
-#COMPILER=/home/xiaolu/bin/arm-eabi-4.4.3/bin/arm-eabi
-#COMPILER_LIB=/home/xiaolu/bin/arm-eabi-4.4.3/lib/gcc/arm-eabi/4.4.3
-COMPILER=e:/tools/cygwin/toolchains/arm-linux-androideabi-4.4.3/bin/arm-linux-androideabi
-COMPILER_LIB=e:/tools/cygwin/toolchains/arm-linux-androideabi-4.4.3/lib/gcc/arm-linux-androideabi/4.4.3
+#COMPILER=/home/xiaolu/bin/arm-eabi-4.4.3/bin/arm-eabi-
+COMPILER=e:/tools/cygwin/toolchains/arm-linux-androideabi-4.4.3/bin/arm-linux-androideabi-
+COMPILER_LIB=$(${COMPILER}gcc -print-libgcc-file-name)
+COMPILER_LIB=${COMPILER_LIB/\/libgcc.a/}
 ##############################################################################
 #set -x
 
@@ -63,16 +63,16 @@ C_ERR="\033[1;31m"
 C_CLEAR="\033[0;0m"
 
 printhl() {
-	printf "${C_H1}[$(basename $0)]${1}${C_CLEAR} \n"
+	printf "${C_H1}${1}${C_CLEAR} √\n"
 }
 
 printerr() {
-	printf "${C_ERR}[Err] ${1}${C_CLEAR} \n"
+	printf "${C_ERR}${1}${C_CLEAR} ×\n"
 }
 
 cleanup()
 {
-	printhl "Cleaning up...\nfinished..."
+	printhl "Cleaning up & finished."
 	rm -rf $tempdir
 }
 
@@ -118,13 +118,13 @@ EOF
 # find start/end of initramfs in the zImage file
 find_start_end() 
 {
-	pos1=`grep -P -a -b -m 1 --only-matching '\x1F\x8B\x08' $zImage | \
+	pos1=`grep -P -a -b -m 1 -o '\x1F\x8B\x08' $zImage | \
 		cut -f 1 -d : | awk '(int($0)<50000){print $0;exit}'`
-	pos2=`grep -P -a -b -m 1 --only-matching '\x{5D}\x{00}\x..\x{FF}\x{FF}\x{FF}\x{FF}\x{FF}\x{FF}' \
+	pos2=`grep -P -a -b -m 1 -o '\x{5D}\x{00}\x..\x{FF}\x{FF}\x{FF}\x{FF}\x{FF}\x{FF}' \
 		$zImage | cut -f 1 -d : | awk '(int($0)<50000){print $0;exit}'`
-	pos3=`grep -P -a -b -m 1 --only-matching '\xFD\x37\x7A\x58\x5A' $zImage | \
+	pos3=`grep -P -a -b -m 1 -o '\xFD\x37\x7A\x58\x5A' $zImage | \
 		cut -f 1 -d : | tail -1 | awk '(int($0)<50000){print $0;exit}'`
-	pos4=`grep -P -a -b --only-matching '\211\114\132' $zImage | \
+	pos4=`grep -P -a -b -o '\211\114\132' $zImage | \
 		head -2 |tail -1|cut -f 1 -d : | awk '(int($0)<50000){print $0;exit}'`
 	zImagesize=$($STATSIZE $zImage)
 	[ -z $pos1 ] && pos1=$zImagesize
@@ -155,7 +155,7 @@ find_start_end()
 		dd if=$zImage of="$kernel.lzo" bs=$pos4 skip=1 2>/dev/null >/dev/null
 		lzop -d "$kernel.lzo" 2>/dev/null >/dev/null
 		compress_type="lzo"
-	fi	
+	fi
 	#========================================================
 	# Determine cpio compression type:
 	#========================================================
@@ -318,6 +318,56 @@ mkpayload()
 	fi
 	cd $tempdir/resources_tmp
 }
+CHECK_MMC_CAP_ERASE()
+{
+	printhl	"Check MMC_CAP_ERASE instruction:"
+	printhl "\t$(cat $1 | grep -a -o 'Linux version.*\..*\..*:..:.*' | head -n 1 | sed 's/) (/)\n\t(/g')"
+	bad_code_pattern="\x80...\x5C...\x06...\x88...\x60...\x00...\x30...\x01...\x6C...\x09...\x88.......\x64...\x28..." 
+	count_bad=`cat $1 | grep -P -a -b -o $bad_code_pattern | wc -l`
+	pos_bad=`cat $1 | grep -P -a -b -o $bad_code_pattern | head -n 1 | cut -f 1 -d :`
+	[ "$count_bad" -gt 0 ] && \
+		printerr "\t$count_bad occurrences of the bad code signature."
+
+	# Detect occurrences of the GOOD code pattern
+
+	good_code_pattern="\x06...\x60...\x00...\x30...\x88...\x6C.......\x64...\x09...\x88...\x28...\x24..."
+	count_good=`cat $1 | grep -P -a -b -o $good_code_pattern | wc -l`
+	if [ "$count_good" -eq 0 ]; then
+		good_code_pattern="\x80...\x5C...\x06...\x88...\x60...\x00...\x30...\x00...\x6C...\x09...\x88.......\x64...\x28..." 
+  		count_good=`cat $1 | grep -P -a -b -o $good_code_pattern | wc -l`
+  		[ "$count_good" -eq 1 ] && patched=1
+  	fi
+	[ "$count_good" -gt 0 ] && \
+		printhl "\t$count_good occurrences of the good code signature."
+
+	# Print conclusions
+	if [ $count_bad -eq 0 -a $count_good -eq 1 ]; then
+  		if [ "$patched" -eq 1 ]; then
+    			printhl "\tThe kernel has been patched by this method(MMC_CAP_ERASE disabled)."
+  		else
+    			printhl "\tThe kernel is safe(MMC_CAP_ERASE disabled)."
+  		fi
+ 	elif [ $count_bad -eq 1 -a $count_good -eq 0 ]; then
+		pos_bad=$((pos_bad + 28))
+  		#echo $pos_bad
+  		pos_bad_hex=0x`printf %.8x $pos_bad`
+  		printerr "\tFound unsafe instruction at offset $pos_bad($pos_bad_hex)"
+		printf "\tDo you want to patch kernel?(N/y)"
+    		read reply leftover
+         	case $reply in
+                y* | Y*)
+			#patch kernel
+			printhl "\tPatching kernel..."
+			dd if=/dev/zero of=$1 bs=1 count=1 seek=$pos_bad conv=notrunc 2>/dev/null
+			printhl "\tDone.";;
+                *)
+            		printerr "\tnot patch.";;
+
+		esac
+	else
+		printhl "\tNot found anything."
+	fi
+}	
 ###############################################################################
 #
 # code begins
@@ -325,7 +375,7 @@ mkpayload()
 ###############################################################################
 
 printhl "---------------------------kernel repacker for i9100---------------------------"
-if [ ! -e $COMPILER-gcc ] || [ ! -e $COMPILER_LIB ]; then
+if [ ! -e ${COMPILER}gcc ] || [ ! -e $COMPILER_LIB ]; then
 	printerr "compiler not found!";
 	exit 1;
 fi
@@ -334,6 +384,8 @@ if [ -z $1 ] || [ -z $2 ] || [ ! -f $1 ] || [ ! -e $2 ]; then
 fi
 
 find_start_end
+CHECK_MMC_CAP_ERASE $kernel
+#cleanup && exit
 count=$end
 printhl "CPIO image MAX size:$count"
 headcount=$((end + start))
@@ -403,7 +455,7 @@ fi
 #============================================
 # rebuild zImage
 #============================================
-printhl "Now we are rebuilding the zImage"
+printhl "Now we are rebuilding the zImage:"
 if [ -z $5 ]; then
 	[[ "${4/gzip/}" != "$4" ]] && compress_type="gzip"
 	[[ "${4/xz/}" != "$4" ]] && compress_type="xz"
@@ -435,7 +487,7 @@ CFLAGS_ABI="-mabi=aapcs-linux -mno-thumb-interwork  -D__LINUX_ARM_ARCH__=7 -marc
 #echo $KBUILD_CFLAGS
 
 #1. Image -> piggy.*
-printhl "Image ---> piggy.$compress_type"
+printhl "\tImage ---> piggy.$compress_type"
 llsl=""
 if [ $compress_type = "gzip" ]; then
 	cat arch/arm/boot/Image | gzip -n -f -9 > arch/arm/boot/compressed/piggy.gzip
@@ -449,8 +501,8 @@ elif [ $compress_type = "xz" ]; then
 	(cat arch/arm/boot/Image | xz --check=crc32 --arm --lzma2=,dict=32MiB &&		\
 	printf $(size_append arch/arm/boot/Image)) > arch/arm/boot/compressed/piggy.xzkern
 
-	printhl "Compiling ashldi3.o"
-	$COMPILER-gcc -Wp,-MD,arch/arm/boot/compressed/.ashldi3.o.d  $NOSTDINC_FLAGS \
+	printhl "\tCompiling ashldi3.o"
+	${COMPILER}gcc -Wp,-MD,arch/arm/boot/compressed/.ashldi3.o.d  $NOSTDINC_FLAGS \
 	-D__ASSEMBLY__ $CFLAGS_ABI  -include asm/unified.h -msoft-float -gdwarf-2     \
 	-Wa,-march=all   -c -o arch/arm/boot/compressed/ashldi3.o arch/arm/lib/ashldi3.S
 elif [ $compress_type = "lzo" ]; then
@@ -459,40 +511,40 @@ elif [ $compress_type = "lzo" ]; then
 fi
 
 #2. piggy.* -> piggy.*.o
-printhl "piggy.$compress_type ---> piggy.$compress_type.o"
-$COMPILER-gcc -Wp,-MD,arch/arm/boot/compressed/.piggy.$compress_type.o.d  $NOSTDINC_FLAGS -D__ASSEMBLY__ $CFLAGS_ABI  -include asm/unified.h -msoft-float -gdwarf-2    -Wa,-march=all    -c -o arch/arm/boot/compressed/piggy.$compress_type.o arch/arm/boot/compressed/piggy.$compress_type.S
+printhl "\tpiggy.$compress_type ---> piggy.$compress_type.o"
+${COMPILER}gcc -Wp,-MD,arch/arm/boot/compressed/.piggy.$compress_type.o.d  $NOSTDINC_FLAGS -D__ASSEMBLY__ $CFLAGS_ABI  -include asm/unified.h -msoft-float -gdwarf-2    -Wa,-march=all    -c -o arch/arm/boot/compressed/piggy.$compress_type.o arch/arm/boot/compressed/piggy.$compress_type.S
 
 #3. head.o
-printhl "Compiling head.o"
-$COMPILER-gcc -Wp,-MD,arch/arm/boot/compressed/.head.o.d  $NOSTDINC_FLAGS -D__ASSEMBLY__ $CFLAGS_ABI  -include asm/unified.h -msoft-float -gdwarf-2    -Wa,-march=all  -DTEXT_OFFSET=0x00008000 -DFIPS_KERNEL_RAM_BASE=0x40008000   -c -o arch/arm/boot/compressed/head.o arch/arm/boot/compressed/head.S
+printhl "\tCompiling head.o"
+${COMPILER}gcc -Wp,-MD,arch/arm/boot/compressed/.head.o.d  $NOSTDINC_FLAGS -D__ASSEMBLY__ $CFLAGS_ABI  -include asm/unified.h -msoft-float -gdwarf-2    -Wa,-march=all  -DTEXT_OFFSET=0x00008000 -DFIPS_KERNEL_RAM_BASE=0x40008000   -c -o arch/arm/boot/compressed/head.o arch/arm/boot/compressed/head.S
 
 #4. misc.o
-printhl "Compiling misc.o"
-$COMPILER-gcc -Wp,-MD,arch/arm/boot/compressed/.misc.o.d  $NOSTDINC_FLAGS $KBUILD_CFLAGS -O2 -fdiagnostics-show-option -Werror -Wno-error=unused-function -Wno-error=unused-variable -Wno-error=unused-value -Wno-error=unused-label -marm -fno-dwarf2-cfi-asm -fno-omit-frame-pointer -mapcs -mno-sched-prolog $CFLAGS_ABI -msoft-float -Uarm -Wframe-larger-than=1024 -fno-stack-protector -fno-omit-frame-pointer -fno-optimize-sibling-calls -g -Wdeclaration-after-statement -Wno-pointer-sign -fno-strict-overflow -fconserve-stack -fpic -fno-builtin  $CFLAGS_KERNEL -D"KBUILD_STR(s)=\#s" -D"KBUILD_BASENAME=KBUILD_STR(misc)"  -D"KBUILD_MODNAME=KBUILD_STR(misc)" -c -o arch/arm/boot/compressed/misc.o arch/arm/boot/compressed/misc.c
+printhl "\tCompiling misc.o"
+${COMPILER}gcc -Wp,-MD,arch/arm/boot/compressed/.misc.o.d  $NOSTDINC_FLAGS $KBUILD_CFLAGS -O2 -fdiagnostics-show-option -Werror -Wno-error=unused-function -Wno-error=unused-variable -Wno-error=unused-value -Wno-error=unused-label -marm -fno-dwarf2-cfi-asm -fno-omit-frame-pointer -mapcs -mno-sched-prolog $CFLAGS_ABI -msoft-float -Uarm -Wframe-larger-than=1024 -fno-stack-protector -fno-omit-frame-pointer -fno-optimize-sibling-calls -g -Wdeclaration-after-statement -Wno-pointer-sign -fno-strict-overflow -fconserve-stack -fpic -fno-builtin  $CFLAGS_KERNEL -D"KBUILD_STR(s)=\#s" -D"KBUILD_BASENAME=KBUILD_STR(misc)"  -D"KBUILD_MODNAME=KBUILD_STR(misc)" -c -o arch/arm/boot/compressed/misc.o arch/arm/boot/compressed/misc.c
 
 #5. decompress.o
-printhl "Compiling decompress.o"
-$COMPILER-gcc -Wp,-MD,arch/arm/boot/compressed/.decompress.o.d  $NOSTDINC_FLAGS $KBUILD_CFLAGS -O2 -fdiagnostics-show-option -Werror -Wno-error=unused-function -Wno-error=unused-variable -Wno-unused-but-set-variable -Wno-error=unused-value -Wno-error=unused-label -marm -fno-dwarf2-cfi-asm -fno-omit-frame-pointer -mapcs -mno-sched-prolog $CFLAGS_ABI -msoft-float -Uarm -Wframe-larger-than=1024 -fno-stack-protector -fno-omit-frame-pointer -fno-optimize-sibling-calls -g -Wdeclaration-after-statement -Wno-pointer-sign -fno-strict-overflow -fconserve-stack -fpic -fno-builtin  $CFLAGS_KERNEL -D"KBUILD_STR(s)=\#s" -D"KBUILD_BASENAME=KBUILD_STR(decompress)"  -D"KBUILD_MODNAME=KBUILD_STR(decompress)" -c -o arch/arm/boot/compressed/decompress.o arch/arm/boot/compressed/decompress.c
+printhl "\tCompiling decompress.o"
+${COMPILER}gcc -Wp,-MD,arch/arm/boot/compressed/.decompress.o.d  $NOSTDINC_FLAGS $KBUILD_CFLAGS -O2 -fdiagnostics-show-option -Werror -Wno-error=unused-function -Wno-error=unused-variable -Wno-unused-but-set-variable -Wno-error=unused-value -Wno-error=unused-label -marm -fno-dwarf2-cfi-asm -fno-omit-frame-pointer -mapcs -mno-sched-prolog $CFLAGS_ABI -msoft-float -Uarm -Wframe-larger-than=1024 -fno-stack-protector -fno-omit-frame-pointer -fno-optimize-sibling-calls -g -Wdeclaration-after-statement -Wno-pointer-sign -fno-strict-overflow -fconserve-stack -fpic -fno-builtin  $CFLAGS_KERNEL -D"KBUILD_STR(s)=\#s" -D"KBUILD_BASENAME=KBUILD_STR(decompress)"  -D"KBUILD_MODNAME=KBUILD_STR(decompress)" -c -o arch/arm/boot/compressed/decompress.o arch/arm/boot/compressed/decompress.c
 
 #6. lib1funcs.o
-printhl "Compiling lib1funcs.o"
-$COMPILER-gcc -Wp,-MD,arch/arm/boot/compressed/.lib1funcs.o.d  $NOSTDINC_FLAGS -D__ASSEMBLY__ $CFLAGS_ABI  -include asm/unified.h -msoft-float -gdwarf-2    -Wa,-march=all     -c -o arch/arm/boot/compressed/lib1funcs.o arch/arm/lib/lib1funcs.S
+printhl "\tCompiling lib1funcs.o"
+${COMPILER}gcc -Wp,-MD,arch/arm/boot/compressed/.lib1funcs.o.d  $NOSTDINC_FLAGS -D__ASSEMBLY__ $CFLAGS_ABI  -include asm/unified.h -msoft-float -gdwarf-2    -Wa,-march=all     -c -o arch/arm/boot/compressed/lib1funcs.o arch/arm/lib/lib1funcs.S
 
 #7. vmlinux.lds
-printhl "Create vmlinux.lds"
+printhl "\tCreate vmlinux.lds"
 sed "s/TEXT_START/0/;s/BSS_START/ALIGN(8)/" < arch/arm/boot/compressed/vmlinux.lds.in > arch/arm/boot/compressed/vmlinux.lds
 
 #8. head.o + misc.o + piggy.*.o --> vmlinux
 [ $llsl ] && ashldi3=" + ashldi3.o"
-printhl "head.o + misc.o + piggy.$compress_type.o + decompress.o + lib1funcs.o$ashldi3---> vmlinux"
-$COMPILER-ld -EL    --defsym zreladdr=0x40008000 -p --no-undefined -X -T arch/arm/boot/compressed/vmlinux.lds arch/arm/boot/compressed/head.o arch/arm/boot/compressed/piggy.$compress_type.o arch/arm/boot/compressed/misc.o arch/arm/boot/compressed/decompress.o arch/arm/boot/compressed/lib1funcs.o $llsl -o arch/arm/boot/compressed/vmlinux
+printhl "\thead.o + misc.o + piggy.$compress_type.o + decompress.o + lib1funcs.o$ashldi3---> vmlinux"
+${COMPILER}ld -EL    --defsym zreladdr=0x40008000 -p --no-undefined -X -T arch/arm/boot/compressed/vmlinux.lds arch/arm/boot/compressed/head.o arch/arm/boot/compressed/piggy.$compress_type.o arch/arm/boot/compressed/misc.o arch/arm/boot/compressed/decompress.o arch/arm/boot/compressed/lib1funcs.o $llsl -o arch/arm/boot/compressed/vmlinux
 
 #9. vmlinux -> zImage
-printhl "vmlinux ---> zImage"
-$COMPILER-objcopy -O binary -R .comment -S  arch/arm/boot/compressed/vmlinux arch/arm/boot/zImage
+printhl "\tvmlinux ---> zImage"
+${COMPILER}objcopy -O binary -R .comment -S  arch/arm/boot/compressed/vmlinux arch/arm/boot/zImage
 
 newzImagesize=$($STATSIZE arch/arm/boot/zImage)
-printhl "Compiled new zImage size:$newzImagesize"
+printhl "\tCompiled new zImage size:$newzImagesize"
 
 #MAKE_FIPS
 MAKE_FIPS_BINARY arch/arm/boot/zImage
