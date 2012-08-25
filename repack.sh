@@ -3,10 +3,7 @@
 # you should point where your cross-compiler is         
 #COMPILER=/home/xiaolu/bin/arm-eabi-4.4.3/bin/arm-eabi-
 COMPILER="e:/tools/cygwin/toolchains/arm-linux-androideabi-4.4.3/bin/arm-linux-androideabi-"
-COMPILER_LIB=$(${COMPILER}gcc -print-libgcc-file-name 2>/dev/null)
-COMPILER_LIB=${COMPILER_LIB/\/libgcc.a/}
-[[ "$OSTYPE" =~ ^cygwin ]] && \
-    COMPILER_LIB="e:/tools/cygwin/toolchains/arm-linux-androideabi-4.4.3/lib/gcc/arm-linux-androideabi/4.4.3"
+COMPILER_LIB=$(${COMPILER}gcc -print-libgcc-file-name | sed -r 's/\/libgcc.a$//')
 ##############################################################################
 #set -x
 trap "cleanup" 2 3 4
@@ -380,7 +377,7 @@ CHECK_MMC_CAP_ERASE()
 ###############################################################################
 
 printhl "---------------------------kernel repacker for i9100---------------------------"
-if [ ! -e ${COMPILER}gcc ]; then
+if [ ! -e ${COMPILER}gcc ] || [ ! -e $COMPILER_LIB ]; then
 	printerr "compiler not found!";
 	exit 1;
 fi
