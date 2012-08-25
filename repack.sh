@@ -2,11 +2,14 @@
 ##############################################################################
 # you should point where your cross-compiler is         
 #COMPILER=/home/xiaolu/bin/arm-eabi-4.4.3/bin/arm-eabi-
-COMPILER=e:/tools/cygwin/toolchains/arm-linux-androideabi-4.4.3/bin/arm-linux-androideabi-
-COMPILER_LIB=$(${COMPILER}gcc -print-libgcc-file-name)
+COMPILER="e:/tools/cygwin/toolchains/arm-linux-androideabi-4.4.3/bin/arm-linux-androideabi-"
+COMPILER_LIB=$(${COMPILER}gcc -print-libgcc-file-name 2>/dev/null)
 COMPILER_LIB=${COMPILER_LIB/\/libgcc.a/}
+[[ "$OSTYPE" =~ ^cygwin ]] && \
+    COMPILER_LIB="e:/tools/cygwin/toolchains/arm-linux-androideabi-4.4.3/lib/gcc/arm-linux-androideabi/4.4.3"
 ##############################################################################
 #set -x
+trap "cleanup" 2 3 4
 
 srcdir=`dirname $0`
 # PLATFORM DETECTION
@@ -33,7 +36,6 @@ if [[ "$OSTYPE" =~ ^darwin ]]; then
 
     # No arguments to dd.
     DDARG=
-
 else
     # TODO: defaults to Linux. We should detect other platforms.
     PLATFORM="linux"
@@ -72,21 +74,22 @@ printerr() {
 
 cleanup()
 {
-	printhl "Cleaning up & finished."
+	printhl "\nCleaning up & finished."
 	rm -rf $tempdir
+	exit 0
 }
 
 exit_usage() {
 	printf $C_H1
-	cat << EOF
+	cat << EOT
+$0 $@
+Error:Not enough parameters or file not found!
 Usage:$0 <zImage> <initramfs> [new_zImage_name] [c_type or payload] [c_type]
 	zImage		= the zImage file (kernel) you wish to repack
 	initramfs	= the initramfs you wish to pack into the zImage(file or directory)
 	new_zImage	= new zImage name
 	c_type		= compression type(gzip lzo lzma xz)
 	payload		= padding payload files to new zImage
-
-Error:Not enough parameters or file not found!
 
 Repack zImage,Example:
 	$0 zImagesys267 initramfs.cpio zImage
@@ -109,7 +112,7 @@ Custom zImage compression type:
 	or
 	$0 zImagesy267 initramfs.cpio new_zImage payload gzip
 
-EOF
+EOT
 	printf $C_CLEAR
 	rm -rf $tempdir
 	exit 1
@@ -132,6 +135,7 @@ find_start_end()
 	[ -z $pos3 ] && pos3=$zImagesize
 	[ -z $pos4 ] && pos4=$zImagesize
 	minpos=`echo -e "$pos1\n$pos2\n$pos3\n$pos4" | sort -n | head -1`
+	#uncompress kernel 
 	if [ $minpos -eq $zImagesize ]; then
 		printerr "not found kernel from $zImage!"
 		cleanup && exit 1
@@ -148,7 +152,7 @@ find_start_end()
 		compress_type="lzma"
 	elif [ $minpos -eq $pos3 ]; then
 		printhl "Extracting xz'd kernel from $zImage (start = $pos3)"
-    		dd status=noxfer if=$zImage bs=$pos3 skip=1 2>/dev/null | unxz -qf > $kernel 2>/dev/null
+		dd status=noxfer if=$zImage bs=$pos3 skip=1 2>/dev/null | unxz -qf > $kernel 2>/dev/null
 		compress_type="xz"
 	elif [ $minpos -eq $pos4 ]; then
 		printhl "Extracting lzo'd kernel from $zImage (start = $pos4)"
@@ -162,41 +166,42 @@ find_start_end()
 	for x in none gzip bzip lzma lzop; do
 		case $x in
 			bzip)
-                		csig='\x{31}\x{41}\x{59}\x{26}\x{53}\x{59}'
-                		ucmd='bunzip2 -q'
-                		fext='.bz2'
-                		;;
+				csig='\x{31}\x{41}\x{59}\x{26}\x{53}\x{59}'
+				ucmd='bunzip2 -q'
+				fext='.bz2'
+				;;
 
-            		gzip)
-                		csig='\x1F\x8B\x08'
-               			ucmd='gunzip -q'
-                		fext='.gz'
-                		;;
+			gzip)
+				csig='\x1F\x8B\x08'
+				   ucmd='gunzip -q'
+				fext='.gz'
+				;;
 
-            		lzma)
-                		csig='\x{5D}\x{00}\x..\x{FF}\x{FF}\x{FF}\x{FF}\x{FF}\x{FF}'
-                		ucmd='unlzma -q'
-                		fext='.lzma'
-                		;;
+			lzma)
+				csig='\x{5D}\x{00}\x..\x{FF}\x{FF}\x{FF}\x{FF}\x{FF}\x{FF}'
+				ucmd='unlzma -q'
+				fext='.lzma'
+				;;
 
-            		lzop)
-                		csig='\211\114\132'
+			lzop)
+				csig='\211\114\132'
 				ucmd='lzop -d'
-                		fext='.lzo'
-                		;;
+				fext='.lzo'
+				;;
 
-            		none)
-                		csig='070701'
-                		ucmd=
-                		fext=
-                		;;
-        	esac
+			none)
+				csig='070701'
+				ucmd=
+				fext=
+				;;
+		
+		esac
 
-        	#========================================================================
-        	# Search for compressed cpio archive
-        	#========================================================================
-        	search=$(grep -P -a -b -m 1 -o $csig $kernel | cut -f 1 -d : | head -1)
-        	pos=${search:-0}
+		#========================================================================
+		# Search for compressed cpio archive
+		#========================================================================
+		search=$(grep -P -a -b -m 1 -o $csig $kernel | cut -f 1 -d : | head -1)
+		pos=${search:-0}
 		if [ ${pos} -gt 0 ]; then
 			if [ ${pos} -le ${cpio_compressed_start:-0} ] || [ -z $cpio_compressed_start ];then
 				cpio_compressed_start=$pos
@@ -207,8 +212,9 @@ find_start_end()
 				#break
 			fi
 		fi
-	done 
-
+	done
+	
+	#uncompress cpio,find cpio start and end offset
 	[ $compression_name = "bzip" ] && cpio_compressed_start=$((cpio_compressed_start - 4))
 	start=$cpio_compressed_start
 	dd if=$kernel of=$test_unzipped_cpio bs=$cpio_compressed_start skip=1 2>/dev/null >/dev/null
@@ -222,7 +228,7 @@ find_start_end()
 		#end=$((end - end%16))
 		cpio_compress_type=$compression_name
 	else
-        	printhl "Non-compressed CPIO image from kernel image (offset = $cpio_compressed_start)."
+			printhl "Non-compressed CPIO image from kernel image (offset = $cpio_compressed_start)."
 		start_zero='0707010{39}10{55}B0{8}TRAILER!!!'
 		end1=`grep -P -a -b -m 1 -o $start_zero $test_unzipped_cpio | head -1 | cut -f 1 -d :`
 		end1=$((end1 + 120))
@@ -244,7 +250,7 @@ function size_append()
 	sed 's/\(..\)/\1 /g' | {					\
 		read ch0 ch1 ch2 ch3;					\
 		for ch in $ch3 $ch2 $ch1 $ch0; do			\
-			printf '%s%03o' '\' $((0x$ch)); 		\
+			printf '%s%03o' '\' $((0x$ch));		 \
 		done;							\
 	}
 }
@@ -258,7 +264,7 @@ function count512()
 	else
 		fsize=$((fsize/512))
 	fi
- 	printf $fsize
+	printf $fsize
 }
 #use null string fill to 512 bytes integer times 
 function append512()
@@ -334,35 +340,34 @@ CHECK_MMC_CAP_ERASE()
 	count_good=`cat $1 | grep -P -a -b -o $good_code_pattern | wc -l`
 	if [ "$count_good" -eq 0 ]; then
 		good_code_pattern="\x80...\x5C...\x06...\x88...\x60...\x00...\x30...\x00...\x6C...\x09...\x88.......\x64...\x28..." 
-  		count_good=`cat $1 | grep -P -a -b -o $good_code_pattern | wc -l`
-  		[ "$count_good" -eq 1 ] && patched=1
-  	fi
+		count_good=`cat $1 | grep -P -a -b -o $good_code_pattern | wc -l`
+		[ "$count_good" -eq 1 ] && patched=1
+	fi
 	[ "$count_good" -gt 0 ] && \
 		printhl "\t$count_good occurrences of the good code signature."
 
 	# Print conclusions
 	if [ $count_bad -eq 0 -a $count_good -eq 1 ]; then
-  		if [ "$patched" -eq 1 ]; then
-    			printhl "\tThe kernel has been patched by this method(MMC_CAP_ERASE disabled)."
-  		else
-    			printhl "\tThe kernel is safe(MMC_CAP_ERASE disabled)."
-  		fi
- 	elif [ $count_bad -eq 1 -a $count_good -eq 0 ]; then
+		if [ "$patched" -eq 1 ]; then
+			printhl "\tThe kernel has been patched by this method(MMC_CAP_ERASE disabled)."
+		else
+			printhl "\tThe kernel is safe(MMC_CAP_ERASE disabled)."
+		fi
+	elif [ $count_bad -eq 1 -a $count_good -eq 0 ]; then
 		pos_bad=$((pos_bad + 28))
-  		#echo $pos_bad
-  		pos_bad_hex=0x`printf %.8x $pos_bad`
-  		printerr "\tFound unsafe instruction at offset $pos_bad($pos_bad_hex)"
+		#echo $pos_bad
+		pos_bad_hex=0x`printf %.8x $pos_bad`
+		printerr "\tFound unsafe instruction at offset $pos_bad($pos_bad_hex)"
 		printf "\tDo you want to patch kernel?(N/y)"
-    		read reply leftover
-         	case $reply in
-                y* | Y*)
+		read reply leftover
+		case $reply in
+			y* | Y*)
 			#patch kernel
 			printhl "\tPatching kernel..."
 			dd if=/dev/zero of=$1 bs=1 count=1 seek=$pos_bad conv=notrunc 2>/dev/null
 			printhl "\tDone.";;
-                *)
-            		printerr "\tnot patch.";;
-
+			*)
+				printerr "\tnot patch.";;
 		esac
 	else
 		printhl "\tNot found anything."
@@ -380,7 +385,7 @@ if [ ! -e ${COMPILER}gcc ] || [ ! -e $COMPILER_LIB ]; then
 	exit 1;
 fi
 if [ -z $1 ] || [ -z $2 ] || [ ! -f $1 ] || [ ! -e $2 ]; then
-	exit_usage
+	exit_usage $*
 fi
 
 find_start_end
@@ -503,7 +508,7 @@ elif [ $compress_type = "xz" ]; then
 
 	printhl "\tCompiling ashldi3.o"
 	${COMPILER}gcc -Wp,-MD,arch/arm/boot/compressed/.ashldi3.o.d  $NOSTDINC_FLAGS \
-	-D__ASSEMBLY__ $CFLAGS_ABI  -include asm/unified.h -msoft-float -gdwarf-2     \
+	-D__ASSEMBLY__ $CFLAGS_ABI  -include asm/unified.h -msoft-float -gdwarf-2	\
 	-Wa,-march=all   -c -o arch/arm/boot/compressed/ashldi3.o arch/arm/lib/ashldi3.S
 elif [ $compress_type = "lzo" ]; then
 	(cat arch/arm/boot/Image | lzop -9 && printf $(size_append arch/arm/boot/Image)) \
