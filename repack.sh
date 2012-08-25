@@ -380,7 +380,7 @@ CHECK_MMC_CAP_ERASE()
 ###############################################################################
 
 printhl "---------------------------kernel repacker for i9100---------------------------"
-if [ ! -e ${COMPILER}gcc ] || [ ! -e $COMPILER_LIB ]; then
+if [ ! -e ${COMPILER}gcc ]; then
 	printerr "compiler not found!";
 	exit 1;
 fi
