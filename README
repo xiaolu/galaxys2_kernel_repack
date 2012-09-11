@@ -1,5 +1,10 @@
 = Galaxy S2 Kernel Packing/Repacking Tools =
 
+Use cygwin you must install lzop and OpenSSL binary.
+
+arm-linux-androideabi-4.4.3-windows.tar.gz compiler: http://d-h.st/Tqj
+
+
 To unpack:
         $ ./unpack.sh [original_zImage] [unpack_output_dir]
 

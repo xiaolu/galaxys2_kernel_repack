@@ -37,7 +37,7 @@ else
     # TODO: defaults to Linux. We should detect other platforms.
     PLATFORM="linux"
 
-    tempdir=$(mktemp -d)
+    tempdir=$(mktemp -d /tmp/krepack.XXXX)
     srcdir=`realpath -s $srcdir`
 
     # standard gnu stat uses -c %s to get size
@@ -56,6 +56,7 @@ head_image="$tempdir/head.image"
 tail_image="$tempdir/tail.image"
 ramdisk_image="$tempdir/ramdisk.image"
 workdir=`pwd`
+[ $2 == "patch" ] && onlypatch=1
 
 C_H1="\033[1;32m"
 C_ERR="\033[1;31m"
@@ -155,6 +156,7 @@ find_start_end()
 		lzop -d "$kernel.lzo" 2>/dev/null >/dev/null
 		compress_type="lzo"
 	fi
+	[ $onlypatch ] && return
 	#========================================================
 	# Determine cpio compression type:
 	#========================================================
@@ -310,7 +312,7 @@ mkpayload()
 	if [ -d $1/recovery ]; then
 		cd $1/recovery
 		#fakeroot tar -Jcf $tempdir/resources_tmp/recovery.tar.xz *
-		tar --owner=root --group=root -acf $tempdir/resources_tmp/recovery.tar.xz *
+		tar --owner=0 --group=0 -acf $tempdir/resources_tmp/recovery.tar.xz *
 	else
 		touch $tempdir/resources_tmp/recovery.tar.xz
 	fi
@@ -319,20 +321,20 @@ mkpayload()
 CHECK_MMC_CAP_ERASE()
 {
 	printhl	"Check MMC_CAP_ERASE instruction:"
-	printhl "    $(cat $1 | grep -a -o 'Linux version.*\..*\..*:..:.*' | head -n 1 | sed 's/) (/)\n    (/g')"
+	printhl "    $(grep -a -o 'Linux version.*\..*\..*:..:.*' $1 | head -n 1 | sed 's/) (/)\n    (/g')"
 	bad_code_pattern="\x80...\x5C...\x06...\x88...\x60...\x00...\x30...\x01...\x6C...\x09...\x88.......\x64...\x28..." 
-	count_bad=`cat $1 | grep -P -a -b -o $bad_code_pattern | wc -l`
-	pos_bad=`cat $1 | grep -P -a -b -o $bad_code_pattern | head -n 1 | cut -f 1 -d :`
+	count_bad=$(grep -P -a -b -o $bad_code_pattern  $1 | wc -l)
+	pos_bad=$(grep -P -a -b -o $bad_code_pattern  $1 | head -n 1 | cut -f 1 -d :)
 	[ "$count_bad" -gt 0 ] && \
 		printerr "    $count_bad occurrences of the bad code signature."
 
 	# Detect occurrences of the GOOD code pattern
 
 	good_code_pattern="\x06...\x60...\x00...\x30...\x88...\x6C.......\x64...\x09...\x88...\x28...\x24..."
-	count_good=`cat $1 | grep -P -a -b -o $good_code_pattern | wc -l`
+	count_good=$(grep -P -a -b -o $good_code_pattern $1 | wc -l)
 	if [ "$count_good" -eq 0 ]; then
 		good_code_pattern="\x80...\x5C...\x06...\x88...\x60...\x00...\x30...\x00...\x6C...\x09...\x88.......\x64...\x28..." 
-		count_good=`cat $1 | grep -P -a -b -o $good_code_pattern | wc -l`
+		count_good=$(grep -P -a -b -o $good_code_pattern $1 | wc -l)
 		[ "$count_good" -eq 1 ] && patched=1
 	fi
 	[ "$count_good" -gt 0 ] && \
@@ -350,8 +352,7 @@ CHECK_MMC_CAP_ERASE()
 		#echo $pos_bad
 		pos_bad_hex=0x`printf %.8x $pos_bad`
 		printerr "    Found unsafe instruction at offset $pos_bad($pos_bad_hex)"
-		printf "    Do you want to patch kernel?(N/y)"
-		read reply leftover
+		read -p "    Do you want to patch kernel?(N/y)" reply
 		case $reply in
 			y* | Y*)
 			#patch kernel
@@ -376,79 +377,81 @@ if [ ! -e ${COMPILER}gcc ] || [ ! -e $COMPILER_LIB ]; then
 	printerr "compiler not found!";
 	exit 1;
 fi
-if [ -z $1 ] || [ -z $2 ] || [ ! -f $1 ] || [ ! -e $2 ]; then
+if [ ! -f $1 ] || [ -z $2 ]; then
 	exit_usage $*
 fi
 
 find_start_end
 CHECK_MMC_CAP_ERASE $kernel
 #cleanup && exit
-count=$end
-printhl "CPIO image MAX size:$count"
-headcount=$((end + start))
-printhl "Head count:$headcount"
-
-if [ $count -lt 0 ]; then
-	printerr "Could not correctly determine the start/end positions of the CPIO!"
-	cleanup && exit 1
-fi
 
 if [ -d $new_ramdisk ]; then
 	printhl "make initramfs.cpio"
 	#mkbootfs $new_ramdisk > $tempdir/initramfs.cpio
 	cd $new_ramdisk
 	#find . | fakeroot cpio -H newc -o > $tempdir/initramfs.cpio 2>/dev/null
-	find . | cpio -R 0:0 -H newc -o > $tempdir/initramfs.cpio 2>/dev/null
+	find . | sed 's/\.\///g' | cpio -R 0:0 -H newc -o > $tempdir/initramfs.cpio 2>/dev/null	
 	new_ramdisk=$tempdir/initramfs.cpio
 	cd $workdir
 fi
 
-# Check the Image's size
-filesize=$($STATSIZE $kernel)
-# Split the Image #1 ->  head.img
-printhl "Making head.img ( from 0 ~ $start )"
-dd if=$kernel bs=$start count=1 of=$head_image 2>/dev/null >/dev/null
+function makeImage()
+{
+	count=$end
+	printhl "CPIO image MAX size:$count"
+	headcount=$((end + start))
+	printhl "Head count:$headcount"
 
-# Split the Image #2 ->  tail.img
-printhl "Making a tail.img ( from $headcount ~ $filesize )"
-dd if=$kernel bs=$headcount skip=1 of=$tail_image 2>/dev/null >/dev/null
-
-toobig="TRUE"
-for method in "cat" "$cpio_compress_type -f9"; do
-	cat $new_ramdisk | $method - > $ramdisk_image
-	ramdsize=$($STATSIZE $ramdisk_image)
-	printhl "Current ramdsize using $method : $ramdsize with required size : $count bytes"
-	if [ $ramdsize -le $count ]; then
-		printhl "$method accepted!"
-		toobig="FALSE"
-		break;
+	if [ $count -lt 0 ]; then
+		printerr "Could not correctly determine the start/end positions of the CPIO!"
+		cleanup && exit 1
 	fi
-done
+	# Check the Image's size
+	filesize=$($STATSIZE $kernel)
+	# Split the Image #1 ->  head.img
+	printhl "Making head.img ( from 0 ~ $start )"
+	dd if=$kernel bs=$start count=1 of=$head_image 2>/dev/null >/dev/null
 
-if [ "$toobig" == "TRUE" ]; then
-	printerr "New ramdisk is still too big. Repack failed. $ramdsize > $count"
-	cleanup && exit 1
-fi
+	# Split the Image #2 ->  tail.img
+	printhl "Making a tail.img ( from $headcount ~ $filesize )"
+	dd if=$kernel bs=$headcount skip=1 of=$tail_image 2>/dev/null >/dev/null
 
-#Merge head.img + ramdisk
-cat $head_image $ramdisk_image > $tempdir/franken.img
-franksize=$($STATSIZE $tempdir/franken.img)
+	toobig="TRUE"
+	for method in "cat" "$cpio_compress_type -f9"; do
+		cat $new_ramdisk | $method - > $ramdisk_image
+		ramdsize=$($STATSIZE $ramdisk_image)
+		printhl "Current ramdsize using $method : $ramdsize with required size : $count bytes"
+		if [ $ramdsize -le $count ]; then
+			printhl "$method accepted!"
+			toobig="FALSE"
+			break;
+		fi
+	done
 
-#Merge head.img + ramdisk + padding + tail
-if [ $franksize -lt $headcount ]; then
-	printhl "Merging [head+ramdisk] + padding + tail"
-	tempnum=$((headcount - franksize))
-	dd $DDARG if=/dev/zero bs=$tempnum count=1 of=$tempdir/padding 2>/dev/null >/dev/null
-	cat $tempdir/padding $tail_image > $tempdir/newtail.img
-	cat $tempdir/franken.img $tempdir/newtail.img > $tempdir/new_Image
-elif [ $franksize -eq $headcount ]; then
-	printhl "Merging [head+ramdisk] + tail"
-	cat $tempdir/franken.img $tail_image > $tempdir/new_Image
-else
-	printerr "Combined zImage is too large - original end is $end and new end is $franksize"
-	cleanup && exit 1
-fi
+	if [ "$toobig" == "TRUE" ]; then
+		printerr "New ramdisk is still too big. Repack failed. $ramdsize > $count"
+		cleanup && exit 1
+	fi
 
+	#Merge head.img + ramdisk
+	cat $head_image $ramdisk_image > $tempdir/franken.img
+	franksize=$($STATSIZE -c "%s" $tempdir/franken.img)
+
+	#Merge head.img + ramdisk + padding + tail
+	if [ $franksize -lt $headcount ]; then
+		printhl "Merging [head+ramdisk] + padding + tail"
+		tempnum=$((headcount - franksize))
+		dd $DDARG if=/dev/zero bs=$tempnum count=1 of=$tempdir/padding 2>/dev/null >/dev/null
+		cat $tempdir/padding $tail_image > $tempdir/newtail.img
+		cat $tempdir/franken.img $tempdir/newtail.img > $tempdir/new_Image
+	elif [ $franksize -eq $headcount ]; then
+		printhl "Merging [head+ramdisk] + tail"
+		cat $tempdir/franken.img $tail_image > $tempdir/new_Image
+	else
+		printerr "Combined zImage is too large - original end is $end and new end is $franksize"
+		cleanup && exit 1
+	fi
+}
 #============================================
 # rebuild zImage
 #============================================
@@ -463,7 +466,11 @@ else
 fi
 cp -rf $RESOURCES $tempdir/resources_tmp
 cd $tempdir/resources_tmp
-cp $tempdir/new_Image arch/arm/boot/Image
+cp -f $kernel arch/arm/boot/Image
+if [ ! $onlypatch ]; then
+	makeImage
+	cp -f $tempdir/new_Image arch/arm/boot/Image
+fi
 cp -f include/generated/autoconf.$compress_type.h include/generated/autoconf.h
 
 NOSTDINC_FLAGS="-nostdinc -isystem $COMPILER_LIB/include -Iarch/arm/include \
