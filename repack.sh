@@ -20,7 +20,7 @@ head_image="$tempdir/head.image"
 tail_image="$tempdir/tail.image"
 ramdisk_image="$tempdir/ramdisk.image"
 workdir=`pwd`
-[ $2 == "patch" ] && onlypatch=1
+[ ! -z $2 ] && [ $2 == "patch" ] && onlypatch=1
 
 C_H1="\033[1;32m"
 C_ERR="\033[1;31m"
@@ -327,7 +327,7 @@ CHECK_MMC_CAP_ERASE()
 				printerr "    not patch.";;
 		esac
 	else
-		printhl "    Not found anything."
+		printhl "    Nothing found."
 	fi
 }	
 ###############################################################################
