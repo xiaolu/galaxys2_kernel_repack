@@ -4,8 +4,7 @@ arm-linux-androideabi-4.4.3-windows.tar.gz compiler: http://d-h.st/Tqj
 
 Please edit repack.sh:
 	# you should point where your cross-compiler is         
-	COMPILER=/home/xiaolu/bin/android-toolchain-eabi/bin/arm-eabi
-	COMPILER_LIB=/home/xiaolu/bin/android-toolchain-eabi/lib/gcc/arm-eabi/4.5.4
+	COMPILER=/home/xiaolu/bin/android-toolchain-eabi/bin/arm-eabi-
 
 Unpack zImage,Usage:
 	./unpack.sh zImagesy267 sy267
@@ -46,7 +45,7 @@ Custom zImage compression type:
 cygwin要使用windows版的编译器：arm-linux-androideabi-4.4.3-windows.tar.gz compiler http://d-h.st/Tqj
 
 修改repack.sh开头的编译器路径和库文件路径，改为你自己的：
-	COMPILER=/home/xiaolu/bin/android-toolchain-eabi/bin/arm-eabi
+	COMPILER=/home/xiaolu/bin/android-toolchain-eabi/bin/arm-eabi-
 	COMPILER_LIB=/home/xiaolu/bin/android-toolchain-eabi/lib/gcc/arm-eabi/4.5.4
 	
 解包zImage，例如：
