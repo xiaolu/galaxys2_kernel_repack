@@ -29,7 +29,7 @@ To repack:
 
 Please edit repack.sh:
 	# you should point where your cross-compiler is         
-	COMPILER=/home/xiaolu/bin/android-toolchain-eabi/bin/arm-eabi
+	COMPILER=/home/xiaolu/bin/android-toolchain-eabi/bin/arm-eabi-
 	COMPILER_LIB=/home/xiaolu/bin/android-toolchain-eabi/lib/gcc/arm-eabi/4.5.4
 
 Unpack zImage,Usage:
@@ -68,7 +68,7 @@ Custom zImage compression type:
 
 中文版：
 修改repack.sh开头的编译器路径和库文件路径，改为你自己的：
-	COMPILER=/home/xiaolu/bin/android-toolchain-eabi/bin/arm-eabi
+	COMPILER=/home/xiaolu/bin/android-toolchain-eabi/bin/arm-eabi-
 	COMPILER_LIB=/home/xiaolu/bin/android-toolchain-eabi/lib/gcc/arm-eabi/4.5.4
 	
 解包zImage，例如：

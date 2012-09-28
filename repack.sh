@@ -1,8 +1,8 @@
 #!/bin/bash
 ##############################################################################
 # you should point where your cross-compiler is         
-#COMPILER=/home/xiaolu/bin/arm-eabi-4.4.3/bin/arm-eabi-
-COMPILER="e:/tools/cygwin/toolchains/arm-linux-androideabi-4.4.3/bin/arm-linux-androideabi-"
+COMPILER=/home/xiaolu/bin/arm-eabi-4.4.3/bin/arm-eabi-
+#COMPILER="e:/tools/cygwin/toolchains/arm-linux-androideabi-4.4.3/bin/arm-linux-androideabi-"
 COMPILER_LIB=$(${COMPILER}gcc -print-libgcc-file-name | sed -r 's/\/libgcc.a$//')
 ##############################################################################
 #set -x
@@ -56,7 +56,7 @@ head_image="$tempdir/head.image"
 tail_image="$tempdir/tail.image"
 ramdisk_image="$tempdir/ramdisk.image"
 workdir=`pwd`
-[ $2 == "patch" ] && onlypatch=1
+[ ! -z $2 ] && [ $2 == "patch" ] && onlypatch=1
 
 C_H1="\033[1;32m"
 C_ERR="\033[1;31m"
