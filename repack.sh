@@ -20,7 +20,8 @@ head_image="$tempdir/head.image"
 tail_image="$tempdir/tail.image"
 ramdisk_image="$tempdir/ramdisk.image"
 workdir=`pwd`
-[ ! -z $2 ] && [ $2 == "patch" ] && onlypatch=1
+rm $workdir/repack.log 2>/dev/null 
+exec 2>>$workdir/repack.log
 
 C_H1="\033[1;32m"
 C_ERR="\033[1;31m"
@@ -37,14 +38,14 @@ printerr() {
 cleanup()
 {
 	printf "\nCleaning up...      finished.\n"
-	rm -rf /tmp/krepack.* 2>/dev/null
+	rm -rf /tmp/krepack.*
 	exit 0
 }
 
 exit_usage() {
 	printf $C_H1
 	cat << EOT
-$0 $@
+$0 $*
 Error:Not enough parameters or file not found!
 Usage:$0 <zImage> <initramfs> [new_zImage_name] [c_type or payload] [c_type]
 	zImage		= the zImage file (kernel) you wish to repack
@@ -98,26 +99,26 @@ find_start_end()
 	#uncompress kernel 
 	if [ $minpos -eq $zImagesize ]; then
 		printerr "not found kernel from $zImage!"
-		cleanup && exit 1
+		cleanup
 	elif [ $minpos -eq $pos1 ]; then
 		printhl "Extracting gzip'd kernel from $zImage (start = $pos1)"
-		dd if=$zImage of="$kernel.gz" bs=$pos1 skip=1 2>/dev/null >/dev/null
+		dd if=$zImage of="$kernel.gz" bs=$pos1 skip=1
 		gunzip -qf "$kernel.gz"
 		compress_type="gzip"
 	elif [ $minpos -eq $pos2 ]; then
 		printhl "Extracting lzma'd kernel from $zImage (start = $pos2)"
-		dd if=$zImage of="$kernel.lzma" bs=$pos2 skip=1 2>/dev/null >/dev/null
+		dd if=$zImage of="$kernel.lzma" bs=$pos2 skip=1
 		#unlzma -qf "$kernel.lzma"
-		unlzma -dqc $kernel.lzma > $kernel 2>/dev/null
+		unlzma -dqc $kernel.lzma > $kernel
 		compress_type="lzma"
 	elif [ $minpos -eq $pos3 ]; then
 		printhl "Extracting xz'd kernel from $zImage (start = $pos3)"
-		dd status=noxfer if=$zImage bs=$pos3 skip=1 2>/dev/null | unxz -qf > $kernel 2>/dev/null
+		dd status=noxfer if=$zImage bs=$pos3 skip=1 | unxz -qf > $kernel
 		compress_type="xz"
 	elif [ $minpos -eq $pos4 ]; then
 		printhl "Extracting lzo'd kernel from $zImage (start = $pos4)"
-		dd if=$zImage of="$kernel.lzo" bs=$pos4 skip=1 2>/dev/null >/dev/null
-		lzop -d "$kernel.lzo" 2>/dev/null >/dev/null
+		dd if=$zImage of="$kernel.lzo" bs=$pos4 skip=1
+		lzop -d "$kernel.lzo"
 		compress_type="lzo"
 	fi
 	[ $onlypatch ] && return
@@ -178,7 +179,7 @@ find_start_end()
 	#uncompress cpio,find cpio start and end offset
 	[ $compression_name = "bzip" ] && cpio_compressed_start=$((cpio_compressed_start - 4))
 	start=$cpio_compressed_start
-	dd if=$kernel of=$test_unzipped_cpio bs=$cpio_compressed_start skip=1 2>/dev/null >/dev/null
+	dd if=$kernel of=$test_unzipped_cpio bs=$cpio_compressed_start skip=1
 	if [ ! $compression_name = "none" ]; then
 		printhl "CPIO compression type detected = $compression_name | offset = $cpio_compressed_start."
 		end_zero='[\x01-\xff]\x00{8}'
@@ -193,7 +194,7 @@ find_start_end()
 		start_zero='0707010{39}10{55}B0{8}TRAILER!!!'
 		end1=`grep -P -a -b -m 1 -o $start_zero $test_unzipped_cpio | head -1 | cut -f 1 -d :`
 		end1=$((end1 + 120))
-		dd if=$test_unzipped_cpio of=$test_unzipped_cpio.tmp bs=$end1 skip=1 2>/dev/null >/dev/null
+		dd if=$test_unzipped_cpio of=$test_unzipped_cpio.tmp bs=$end1 skip=1
 		end_zero='\x00{4}[\x01-\xff]'
 		end2=`grep -P -a -b -m 1 -o $end_zero "$test_unzipped_cpio.tmp" | cut -f 1 -d : | head -1`
 		[ $end2 ] && end2=$((end2 + 4))
@@ -227,7 +228,7 @@ function count512()
 #use null string fill to 512 bytes integer times 
 function append512()
 {
-	dd if=$1 of=$2 bs=512 count=$3 conv=sync 2>/dev/null >/dev/null
+	dd if=$1 of=$2 bs=512 count=$3 conv=sync
 }
 function mkbootoffset()
 {
@@ -264,7 +265,7 @@ mkpayload()
 {
 	printhl "Make payload file(boot.tar.xz|recovery.tar.xz)."	
 	cd $tempdir/resources_tmp
-	rm boot.tar.xz recovery.tar.xz 2>/dev/null
+	rm boot.tar.xz recovery.tar.xz
 	if [ -d $1/boot ]; then
 		cd $1/boot
 		#fakeroot tar -Jcf $tempdir/resources_tmp/boot.tar.xz *
@@ -316,12 +317,17 @@ CHECK_MMC_CAP_ERASE()
 		#echo $pos_bad
 		pos_bad_hex=0x`printf %.8x $pos_bad`
 		printerr "    Found unsafe instruction at offset $pos_bad($pos_bad_hex)"
-		read -p "    Do you want to patch kernel?(N/y)" reply
+        if [ -z $onlypatch ]; then
+        	printf "    Do you want to patch kernel?(N/y)"
+			read reply leftover
+		else
+			reply="y"
+		fi
 		case $reply in
 			y* | Y*)
 			#patch kernel
 			printhl "    Patching kernel..."
-			dd if=/dev/zero of=$1 bs=1 count=1 seek=$pos_bad conv=notrunc 2>/dev/null
+			dd if=/dev/zero of=$1 bs=1 count=1 seek=$pos_bad conv=notrunc
 			printhl "    Done.";;
 			*)
 				printerr "    not patch.";;
@@ -329,36 +335,7 @@ CHECK_MMC_CAP_ERASE()
 	else
 		printhl "    Nothing found."
 	fi
-}	
-###############################################################################
-#
-# code begins
-#
-###############################################################################
-
-printhl "---------------------------kernel repacker for note---------------------------"
-if [ ! -e ${COMPILER}gcc ] || [ ! -e $COMPILER_LIB ]; then
-	printerr "compiler not found!";
-	exit 1;
-fi
-if [ ! -f $1 ] || [ -z $2 ]; then
-	exit_usage $*
-fi
-
-find_start_end
-CHECK_MMC_CAP_ERASE $kernel
-#cleanup && exit
-
-if [ -d $new_ramdisk ]; then
-	printhl "make initramfs.cpio"
-	#mkbootfs $new_ramdisk > $tempdir/initramfs.cpio
-	cd $new_ramdisk
-	#find . | fakeroot cpio -H newc -o > $tempdir/initramfs.cpio 2>/dev/null
-	find . | sed 's/\.\///g' | cpio -R 0:0 -H newc -o > $tempdir/initramfs.cpio 2>/dev/null	
-	new_ramdisk=$tempdir/initramfs.cpio
-	cd $workdir
-fi
-
+}
 function makeImage()
 {
 	count=$end
@@ -368,17 +345,17 @@ function makeImage()
 
 	if [ $count -lt 0 ]; then
 		printerr "Could not correctly determine the start/end positions of the CPIO!"
-		cleanup && exit 1
+		cleanup
 	fi
 	# Check the Image's size
 	filesize=$(stat -c "%s" $kernel)
 	# Split the Image #1 ->  head.img
 	printhl "Making head.img ( from 0 ~ $start )"
-	dd if=$kernel bs=$start count=1 of=$head_image 2>/dev/null >/dev/null
+	dd if=$kernel bs=$start count=1 of=$head_image
 
 	# Split the Image #2 ->  tail.img
 	printhl "Making a tail.img ( from $headcount ~ $filesize )"
-	dd if=$kernel bs=$headcount skip=1 of=$tail_image 2>/dev/null >/dev/null
+	dd if=$kernel bs=$headcount skip=1 of=$tail_image
 
 	toobig="TRUE"
 	for method in "cat" "$cpio_compress_type"; do
@@ -394,7 +371,8 @@ function makeImage()
 
 	if [ "$toobig" == "TRUE" ]; then
 		printerr "New ramdisk is still too big. Repack failed. $ramdsize > $count"
-		cleanup && exit 1
+		printhl "Pls try to use payload method."
+		cleanup
 	fi
 
 	#Merge head.img + ramdisk
@@ -405,7 +383,7 @@ function makeImage()
 	if [ $franksize -lt $headcount ]; then
 		printhl "Merging [head+ramdisk] + padding + tail"
 		tempnum=$((headcount - franksize))
-		dd status=noxfer if=/dev/zero bs=$tempnum count=1 of=$tempdir/padding 2>/dev/null >/dev/null
+		dd status=noxfer if=/dev/zero bs=$tempnum count=1 of=$tempdir/padding
 		cat $tempdir/padding $tail_image > $tempdir/newtail.img
 		cat $tempdir/franken.img $tempdir/newtail.img > $tempdir/new_Image
 	elif [ $franksize -eq $headcount ]; then
@@ -413,25 +391,56 @@ function makeImage()
 		cat $tempdir/franken.img $tail_image > $tempdir/new_Image
 	else
 		printerr "Combined zImage is too large - original end is $end and new end is $franksize"
-		cleanup && exit 1
+		cleanup
 	fi
 }
+###############################################################################
+#
+# code begins
+#
+###############################################################################
+
+printhl "---------------------------kernel repacker for note---------------------------"
+if [ ! -e ${COMPILER}gcc ] || [ ! -e $COMPILER_LIB ]; then
+	printerr "compiler not found!";
+	cleanup
+fi
+if [ ! -f $1 ] || [ -z $2 ] || ([ $2 != "patch" ] && [ ! -e $2 ]); then
+	exit_usage $*
+fi
+[ $2 == "patch" ] && onlypatch=1
+find_start_end
+CHECK_MMC_CAP_ERASE $kernel
+#cleanup
+
+if [ -d $new_ramdisk ]; then
+	printhl "make initramfs.cpio"
+	#mkbootfs $new_ramdisk > $tempdir/initramfs.cpio
+	cd $new_ramdisk
+	#find . | fakeroot cpio -H newc -o > $tempdir/initramfs.cpio
+	find . | cpio -R 0:0 -H newc -o > $tempdir/initramfs.cpio	
+	new_ramdisk=$tempdir/initramfs.cpio
+	cd $workdir
+fi
+
 #============================================
 # rebuild zImage
 #============================================
 printhl "Now we are rebuilding the zImage:"
+m=$(echo "$4" | tr '[A-Z]' '[a-z]')
 if [ -z $5 ]; then
-	[[ "${4/gzip/}" != "$4" ]] && compress_type="gzip"
-	[[ "${4/xz/}" != "$4" ]] && compress_type="xz"
-	[[ "${4/lzo/}" != "$4" ]] && compress_type="lzo"
-	[[ "${4/lzma/}" != "$4" ]] && compress_type="lzma"
+	#[[ "${m/gzip/}" != "$m" ]] && compress_type="gzip"
+	[[ "$m" =~ ^gzip ]] && compress_type="gzip"
+	[[ "$m" =~ ^lzo ]] && compress_type="lzo"
+	[[ "$m" =~ ^lzma ]] && compress_type="lzma"
+	[[ "$m" =~ ^xz ]] && compress_type="xz"
 else
 	compress_type=$5
 fi
 cp -rf $RESOURCES $tempdir/resources_tmp
 cd $tempdir/resources_tmp
 cp -f $kernel arch/arm/boot/Image
-if [ ! $onlypatch ]; then
+if [ -z $onlypatch ]; then
 	makeImage
 	cp -f $tempdir/new_Image arch/arm/boot/Image
 fi
@@ -522,27 +531,27 @@ new_zImage_name="new_zImage"
 if [ ${new_zImage_name:0:1} != "/" ]; then
 	new_zImage_name="$workdir/$new_zImage_name"
 fi
-rm $new_zImage_name 2>/dev/null >/dev/null
-if [[ "${4/payload/}" != "$4" ]]; then
+rm $new_zImage_name
+if [[ "$m" =~ ^payload ]]; then
 	mkpayload ./payload
 	printhl "Padding payload files to $(basename $new_zImage_name)."
-	if [[ "${4/payloadb/}" != "$4" ]]; then	
+	if [[ "$m" =~ ^payloadb ]]; then	
 		mkbootoffset new_zImage arch/arm/boot/zImage boot.tar.xz
 	else
 		mkbootoffset new_zImage arch/arm/boot/zImage boot.tar.xz recovery.tar.xz
 	fi
 	newzImagesize=$(stat -c "%s" new_zImage)
 	printhl "Now zImage size:$newzImagesize bytes."
-	[ $newzImagesize -gt 8388608 ] && printerr "zImage too big..." && cleanup && exit 1
-	printhl "Padding new zImage to 8388608 bytes."
-	dd if=new_zImage of=$new_zImage_name bs=8388608 conv=sync 2>/dev/null >/dev/null
-elif [[ "${4/su/}" != "$4" ]]; then
+	[ $newzImagesize -gt 8388608 ] && printerr "zImage too big..." && cleanup
+	printhl "Padding new zImage to 8M."
+	dd if=new_zImage of=$new_zImage_name bs=8M conv=sync
+elif [[ "$m" =~ ^su ]]; then
 	printhl "Padding sufiles to $new_zImage_name."
-	dd if=arch/arm/boot/zImage of=$new_zImage_name bs=8388608 conv=sync 2>/dev/null >/dev/null
-	dd if=sufile.pad of=$new_zImage_name bs=1 count=222976 seek=7000000 conv=notrunc 2>/dev/null >/dev/null
-elif [[ "${4/pad/}" != "$4" ]]; then
-	printhl "Padding new zImage to 8388608 bytes."
-	dd if=arch/arm/boot/zImage of=$new_zImage_name bs=8388608 conv=sync 2>/dev/null >/dev/null
+	dd if=arch/arm/boot/zImage of=$new_zImage_name bs=8M conv=sync
+	dd if=sufile.pad of=$new_zImage_name bs=1 count=222976 seek=7000000 conv=notrunc
+elif [[ "$m" =~ ^pad ]]; then
+	printhl "Padding new zImage to 8M bytes."
+	dd if=arch/arm/boot/zImage of=$new_zImage_name bs=8M conv=sync
 else
 	cp -f arch/arm/boot/zImage $new_zImage_name
 fi

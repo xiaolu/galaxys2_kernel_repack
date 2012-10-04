@@ -17,6 +17,8 @@ KERNEL_XZ_FILE=kernel.xz
 KERNEL_LZO_FILE=kernel.lzo
 INITRAMFS_FILE=initramfs.cpio
 INITRAMFS_DIR=initramfs_root
+rm $CURRENT_DIR/unpack.log 2>/dev/null 
+exec 2>>$CURRENT_DIR/unpack.log
 
 # DO NOT MODIFY BELOW THIS LINE
 [ -z $1 ] && exit 1 || zImage=$1
@@ -45,13 +47,13 @@ function unpack_kernel()
 {
     # test Compressed format
     pos1=`grep -P -a -b -m 1 --only-matching '\x1F\x8B\x08' $zImage | \
-	cut -f 1 -d : 2>/dev/null | awk '(int($0)<50000){print $0;exit}'`
+	cut -f 1 -d : | awk '(int($0)<50000){print $0;exit}'`
     pos2=`grep -P -a -b -m 1 --only-matching '\x{5D}\x{00}\x..\x{FF}\x{FF}\x{FF}\x{FF}\x{FF}\x{FF}' \
-	$zImage | cut -f 1 -d : 2>/dev/null | awk '(int($0)<50000){print $0;exit}'`
+	$zImage | cut -f 1 -d : | awk '(int($0)<50000){print $0;exit}'`
     pos3=`grep -P -a -b -m 1 --only-matching '\xFD\x37\x7A\x58\x5A' $zImage | \
-	cut -f 1 -d : 2>/dev/null | tail -1 | awk '(int($0)<50000){print $0;exit}'`
+	cut -f 1 -d : | tail -1 | awk '(int($0)<50000){print $0;exit}'`
     pos4=`grep -P -a -b --only-matching '\211\114\132' $zImage | head -2 | \
-	tail -1 | cut -f 1 -d : 2>/dev/null | awk '(int($0)<50000){print $0;exit}'`
+	tail -1 | cut -f 1 -d : | awk '(int($0)<50000){print $0;exit}'`
 
     zImagesize=$(stat -c "%s" $zImage)
     [ -z $pos1 ] && pos1=$zImagesize
@@ -77,29 +79,29 @@ function unpack_kernel()
 function ungzip_kernel()
 {
     printhl "Extracting gzip'd kernel image from file: $zImage (start = $pos1)"
-    dd if=$zImage of=$TEMP_DIR/$KERNEL_GZIP_FILE bs=$pos1 skip=1 2>/dev/null >/dev/null
+    dd if=$zImage of=$TEMP_DIR/$KERNEL_GZIP_FILE bs=$pos1 skip=1
     gunzip -qf $TEMP_DIR/$KERNEL_GZIP_FILE
 }
 
 function unlzma_kernel()
 {
     printhl "Extracting lzma'd kernel image from file: $zImage (start = $pos2)"
-    dd if=$zImage of=$TEMP_DIR/$KERNEL_LZMA_FILE bs=$pos2 skip=1 2>/dev/null >/dev/null
+    dd if=$zImage of=$TEMP_DIR/$KERNEL_LZMA_FILE bs=$pos2 skip=1
 	#unlzma -qf $TEMP_DIR/$KERNEL_GZIP_FILE
-    unlzma -dqc $TEMP_DIR/$KERNEL_LZMA_FILE > $TEMP_DIR/$KERNEL_FILE 2>/dev/null
+    unlzma -dqc $TEMP_DIR/$KERNEL_LZMA_FILE > $TEMP_DIR/$KERNEL_FILE
 }
 
 function unxz_kernel()
 {
     printhl "Extracting xz'd kernel image from file: $zImage (start = $pos3)"
-    dd status=noxfer if=$zImage bs=$pos3 skip=1 2>/dev/null | unxz -qf > $TEMP_DIR/$KERNEL_FILE 2>/dev/null  
+    dd status=noxfer if=$zImage bs=$pos3 skip=1 | unxz -qf > $TEMP_DIR/$KERNEL_FILE  
 }
 
 function unlzo_kernel()
 {
     printhl "Extracting lzo'd kernel image from file: $zImage (start = $pos4)"
-    dd if=$zImage of=$TEMP_DIR/$KERNEL_LZO_FILE bs=$pos4 skip=1 2>/dev/null >/dev/null
-    lzop -d $TEMP_DIR/$KERNEL_LZO_FILE 2>/dev/null >/dev/null
+    dd if=$zImage of=$TEMP_DIR/$KERNEL_LZO_FILE bs=$pos4 skip=1
+    lzop -d $TEMP_DIR/$KERNEL_LZO_FILE
 }
 
 function search_cpio()
@@ -162,12 +164,12 @@ function extract_cpio()
 {
     if [ ! $compression_name = "none" ]; then
         printhl "Extracting $compression_name'd compressed CPIO image from kernel image (offset = $cpio_compressed_start)"
-        dd if=$TEMP_DIR/$KERNEL_FILE of=$TEMP_DIR/$INITRAMFS_FILE$file_ext bs=$cpio_compressed_start skip=1 2>/dev/null >/dev/null
-        $uncompress_cmd $TEMP_DIR/$INITRAMFS_FILE$file_ext 2>/dev/null >/dev/null
+        dd if=$TEMP_DIR/$KERNEL_FILE of=$TEMP_DIR/$INITRAMFS_FILE$file_ext bs=$cpio_compressed_start skip=1
+        $uncompress_cmd $TEMP_DIR/$INITRAMFS_FILE$file_ext
 
     else
         printhl "Extracting non-compressed CPIO image from kernel image (offset = $cpio_compressed_start)"
-        dd if=$TEMP_DIR/$KERNEL_FILE of=$TEMP_DIR/${INITRAMFS_FILE}${file_ext} bs=$cpio_compressed_start skip=1 2>/dev/null >/dev/null
+        dd if=$TEMP_DIR/$KERNEL_FILE of=$TEMP_DIR/${INITRAMFS_FILE}${file_ext} bs=$cpio_compressed_start skip=1
     fi
 }
 
@@ -178,7 +180,7 @@ function expand_cpio_archive()
     if [ -e $TEMP_DIR/$INITRAMFS_FILE ]; then
         mkdir $INITRAMFS_DIR
         cd $INITRAMFS_DIR
-        cpio --quiet -i --make-directories --preserve-modification-time --no-absolute-filenames -F $TEMP_DIR/$INITRAMFS_FILE 2>/dev/null
+        cpio --quiet -i --make-directories --preserve-modification-time --no-absolute-filenames -F $TEMP_DIR/$INITRAMFS_FILE
     fi
 }
 
