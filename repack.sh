@@ -38,7 +38,7 @@ else
     PLATFORM="linux"
 
     tempdir=$(mktemp -d /tmp/krepack.XXXX)
-    srcdir=`realpath -s $srcdir`
+	srcdir="$(readlink -f $srcdir)"
 
     # standard gnu stat uses -c %s to get size
     STATSIZE='stat -c %s'
@@ -49,14 +49,13 @@ fi
 
 RESOURCES=$srcdir/resources
 zImage="$1"
-new_ramdisk="$2"
 kernel="$tempdir/kernel.image"
 test_unzipped_cpio="$tempdir/cpio.image"
 head_image="$tempdir/head.image"
 tail_image="$tempdir/tail.image"
 ramdisk_image="$tempdir/ramdisk.image"
-workdir=`pwd`
-rm $workdir/repack.log 2>/dev/null 
+workdir="$(pwd)"
+rm -f $workdir/repack.log
 exec 2>>$workdir/repack.log
 
 C_H1="\033[1;32m"
@@ -118,6 +117,7 @@ EOT
 # find start/end of initramfs in the zImage file
 find_start_end() 
 {
+	echo "---find_start_end()---" 1>&2
 	pos1=`grep -P -a -b -m 1 -o '\x1F\x8B\x08' $zImage | \
 		cut -f 1 -d : | awk '(int($0)<50000){print $0;exit}'`
 	pos2=`grep -P -a -b -m 1 -o '\x{5D}\x{00}\x..\x{FF}\x{FF}\x{FF}\x{FF}\x{FF}\x{FF}' \
@@ -243,6 +243,7 @@ find_start_end()
 #Calculation of the size of a Image file,hexadecimal high-low turn
 function size_append()
 {
+	echo "---size_append()---" 1>&2
 	fsize=$($STATSIZE $1);
 	ch_a=($(printf "%08x\n" $fsize | sed 's/\(..\)/\1 /g'))
 	for ch in ${ch_a[3]} ${ch_a[2]} ${ch_a[1]} ${ch_a[0]};
@@ -253,6 +254,7 @@ function size_append()
 #Calculation file size, 512 bytes integer times 
 function count512()
 {
+	echo "---count512()---" 1>&2
 	fsize=$($STATSIZE $1);
 	if [ $((fsize%512)) -ne 0 ]; then
 		fsize=$((fsize/512+1))
@@ -264,10 +266,12 @@ function count512()
 #use 00 fill to 512 bytes integer times 
 function append512()
 {
+	echo "---append512()---" 1>&2	
 	dd if=$1 of=$2 bs=512 count=$3 conv=sync
 }
 function mkbootoffset()
 {
+	echo "---mkbootoffset()---" 1>&2	
 	boot_offset=$(count512 $2)
 	append512 $2 $tempdir/zImage512 $boot_offset
 	boot_offset=$((boot_offset+1))
@@ -286,10 +290,10 @@ function mkbootoffset()
 	printf "boot_offset=$boot_offset;boot_len=$boot_len;$recovery_str\n\n" >> $tempdir/BOOT_IMAGE_OFFSETS
 	append512 $tempdir/BOOT_IMAGE_OFFSETS $tempdir/BOOT_IMAGE_OFFSETS512 1
 	cat $tempdir/zImage512 $tempdir/BOOT_IMAGE_OFFSETS512 $boot512 $recovery512 > $1
-	#rm -rf $tempdir
 }
 MAKE_FIPS_BINARY()
 {
+	echo "---MAKE_FIPS_BINARY()---" 1>&2	
 	printhl "MAKE_FIPS for zImage."	
 	openssl dgst -sha256 -hmac 12345678 -binary -out \
 		$1.hmac $1
@@ -299,9 +303,10 @@ MAKE_FIPS_BINARY()
 }
 mkpayload()
 {
+	echo "---mkpayload()---" 1>&2	
 	printhl "Make payload file(boot.tar.xz|recovery.tar.xz)."	
 	cd $tempdir/resources_tmp
-	rm boot.tar.xz recovery.tar.xz
+	rm -f boot.tar.xz recovery.tar.xz
 	if [ -d $1/boot ]; then
 		cd $1/boot
 		#fakeroot tar -Jcf $tempdir/resources_tmp/boot.tar.xz *
@@ -321,6 +326,7 @@ mkpayload()
 }
 CHECK_MMC_CAP_ERASE()
 {
+	echo "---CHECK_MMC_CAP_ERASE()---" 1>&2	
 	printhl	"Check MMC_CAP_ERASE instruction:"
 	printhl "    $(grep -a -o 'Linux version.*\..*\..*:..:.*' $1 | head -n 1 | sed 's/) (/)\n    (/g')"
 	bad_code_pattern="\x80...\x5C...\x06...\x88...\x60...\x00...\x30...\x01...\x6C...\x09...\x88.......\x64...\x28..." 
@@ -374,6 +380,7 @@ CHECK_MMC_CAP_ERASE()
 }
 function makeImage()
 {
+	echo "---makeImage()---" 1>&2	
 	count=$end
 	printhl "CPIO image MAX size:$count"
 	headcount=$((end + start))
@@ -445,20 +452,28 @@ if [ ! -f $1 ] || [ -z $2 ] || ([ $2 != "patch" ] && [ ! -e $2 ]); then
 	exit_usage $*
 fi
 [ $2 == "patch" ] && onlypatch=1
+if [ -z $3 ]; then
+	new_zImage_name="new_zImage"
+else
+	new_zImage_name=$3
+fi
+new_zImage_name=$(readlink -m $new_zImage_name)
+
 find_start_end
 CHECK_MMC_CAP_ERASE $kernel
 #cleanup
 
-if [ -d $new_ramdisk ]; then
+if [ -d $2 ]; then
 	printhl "make initramfs.cpio"
-	#mkbootfs $new_ramdisk > $tempdir/initramfs.cpio
-	cd $new_ramdisk
+	#mkbootfs $2 > $tempdir/initramfs.cpio
+	cd $2
 	#find . | fakeroot cpio -H newc -o > $tempdir/initramfs.cpio
 	find . | sed 's/\.\///g' | cpio -R 0:0 -H newc -o > $tempdir/initramfs.cpio	
-	new_ramdisk=$tempdir/initramfs.cpio
 	cd $workdir
+elif [ -f $2 ]; then
+	cp -rf $2 $tempdir/initramfs.cpio
 fi
-
+new_ramdisk=$tempdir/initramfs.cpio
 #============================================
 # rebuild zImage
 #============================================
@@ -561,13 +576,7 @@ printhl "    Compiled new zImage size:$newzImagesize"
 
 #MAKE_FIPS
 MAKE_FIPS_BINARY arch/arm/boot/zImage
-
-new_zImage_name="new_zImage"
-[ $3 ] && new_zImage_name=$3
-if [ ${new_zImage_name:0:1} != "/" ]; then
-	new_zImage_name="$workdir/$new_zImage_name"
-fi
-rm $new_zImage_name
+rm -f $new_zImage_name
 if [[ "$m" =~ ^payload ]]; then
 	mkpayload ./payload
 	printhl "Padding payload files to $(basename $new_zImage_name)."
