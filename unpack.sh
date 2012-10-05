@@ -17,7 +17,7 @@ KERNEL_XZ_FILE=kernel.xz
 KERNEL_LZO_FILE=kernel.lzo
 INITRAMFS_FILE=initramfs.cpio
 INITRAMFS_DIR=initramfs_root
-rm $CURRENT_DIR/unpack.log 2>/dev/null 
+rm -f $CURRENT_DIR/unpack.log
 exec 2>>$CURRENT_DIR/unpack.log
 
 # DO NOT MODIFY BELOW THIS LINE
