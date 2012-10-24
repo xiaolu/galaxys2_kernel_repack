@@ -97,8 +97,8 @@ function unpack_kernel()
 
     minpos=`echo -e "$pos1\n$pos2\n$pos3\n$pos4" | sort -n | head -1`
     if [ $minpos -eq $zImagesize ]; then
-	printerr "not found kernel from $zImage!"
-	exit 1
+        printhl "$zImage is an uncompressed kernel image"
+        cp "$zImage" "$TEMP_DIR/$KERNEL_FILE"
     elif [ $minpos -eq $pos1 ]; then
         ungzip_kernel
     elif [ $minpos -eq $pos2 ]; then
