@@ -28,6 +28,11 @@ if [[ "$OSTYPE" =~ ^darwin ]]; then
 
     # os x stat uses -f %z to get size
     STATSIZE='stat -f %z'
+elif [[ "$OSTYPE" =~ ^cygwin ]]; then
+
+    PLATFORM="cygwin"
+    FIND=find
+    STATSIZE='stat -c %s'
 
 else
     # TODO: defaults to Linux. We should detect other platforms.
@@ -144,6 +149,9 @@ parse() {
 	local str="${mode} ${uid} ${gid}"
 	[ "${ftype}" == "invalid" ] && return 0
 	[ "${location}" == "${srcdir}" ] && return 0
+
+	[[ "$name" =~ "/.payload" ]] && return 0
+	[[ "$name" =~ "/.git" ]] && return 0
 
 	case "${ftype}" in
 		"file")
