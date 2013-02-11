@@ -59,6 +59,10 @@ INITRAMFS_DIR=initramfs_root
 [ -z $2 ] || INITRAMFS_DIR=$2
 [ -d $TEMP_DIR ] || `mkdir $TEMP_DIR`
 
+PAYLOAD_DIR=$INITRAMFS_DIR/.payload
+RECOVERY_TAR=$TEMP_DIR/recovery.tar
+BOOT_TAR=$TEMP_DIR/boot.tar
+
 C_H1="\033[1;36m" # highlight text 1
 C_ERR="\033[1;31m"
 C_CLEAR="\033[1;0m"
@@ -212,7 +216,7 @@ function expand_cpio_archive()
     printhl "Expanding CPIO archive: $INITRAMFS_FILE to $INITRAMFS_DIR."
 
     if [ -e $TEMP_DIR/$INITRAMFS_FILE ]; then
-        mkdir $INITRAMFS_DIR
+        mkdir -p $INITRAMFS_DIR
         cd $INITRAMFS_DIR
         $CPIO --quiet -i --make-directories --preserve-modification-time --no-absolute-filenames -F $TEMP_DIR/$INITRAMFS_FILE 2>/dev/null
     fi
@@ -223,8 +227,122 @@ function clean_up()
     rm -Rf $TEMP_DIR
 }
 
+#####################################################################################################
+
+function detect_file_compression()
+{
+    filename=$1
+    file_compressed_start=0
+    file_compression_name=""
+    file_compression_signature=""
+    file_uncompress_cmd=""
+    file_file_ext=""
+
+    for x in none xz bzip gzip lzma lzo; do
+        case $x in
+            bzip)
+                csig='\x{31}\x{41}\x{59}\x{26}\x{53}\x{59}'
+                ucmd='bunzip2 -q'
+                fext='.bz2'
+                ;;
+
+            gzip)
+                csig='\x1F\x8B\x08'
+                ucmd='gunzip -q'
+                fext='.gz'
+                ;;
+
+            lzma)
+                csig='\x{5D}\x{00}\x..\x{FF}\x{FF}\x{FF}\x{FF}\x{FF}\x{FF}'
+                ucmd='unlzma -q'
+                fext='.lzma'
+                ;;
+            
+            lzo)
+            	csig='\211\114\132'
+            	ucmd='lzop -d'
+            	fext='.lzo'
+                ;;
+            
+            xz)
+            	csig='\x{FD}\x{37}\x{7A}\x{58}\x{5A}'
+            	ucmd='xz -d'
+            	fext='.xz'
+                ;;
+
+            none)
+                csig='070701'
+                ucmd=
+                fext=
+                ;;
+        esac
+
+        #========================================================================
+        # Search for compressed payload archive
+        #========================================================================
+        search=`grep -P -a -b -m 1 -o $csig $filename | cut -f 1 -d : | head -1`
+        pos=${search:0}
+        if [ "${pos}" != "" ];then #&& [ ${pos} -ge 0 ]; then
+            file_compressed_start=0
+            file_compression_name=$x
+            file_compression_signature=$csig
+            file_uncompress_cmd=$ucmd
+            file_file_ext=$fext
+            if [ ${pos} -le ${file_compressed_start:-0} ] || [ -z $file_compressed_start ];then
+                file_compressed_start=$pos
+            fi
+			break	
+        fi
+    done 
+
+    [ $file_compression_name = "bzip" ] && file_compressed_start=$((file_compressed_start - 4))
+}
+
+function boot_extract()
+{
+    [ $boot_offset -le 0 ] && return 1
+    [ $boot_len -le 0 ] && return 1
+
+    dd bs=512 if=$zImage skip=$boot_offset count=$boot_len of=$BOOT_TAR > /dev/null 2>&1
+
+    detect_file_compression $BOOT_TAR
+    mv $BOOT_TAR $BOOT_TAR$file_file_ext
+    printhl "Found payload: 'boot' compression=$file_compression_name offset=$boot_offset, len=$boot_len"
+
+    printhl "Extracting '$BOOT_TAR$file_file_ext' ..."
+    mkdir -p $PAYLOAD_DIR/boot
+    cat $BOOT_TAR$file_file_ext | $file_uncompress_cmd | tar -xC $PAYLOAD_DIR/boot > /dev/null 2>&1
+}
+
+function recovery_extract()
+{
+    [ $recovery_offset -le 0 ] && return 1
+    [ $recovery_len -le 0 ] && return 1
+
+    dd bs=512 if=$zImage skip=$recovery_offset count=$recovery_len of=$RECOVERY_TAR > /dev/null 2>&1
+
+    detect_file_compression $RECOVERY_TAR
+    mv $RECOVERY_TAR $RECOVERY_TAR$file_file_ext
+    printhl "Found payload: 'recovery' compression=$file_compression_name offset=$recovery_offset, len=$recovery_len"
+   
+    printhl "Extracting '$RECOVERY_TAR$file_file_ext' ..."
+    mkdir -p $PAYLOAD_DIR/recovery
+    cat $RECOVERY_TAR$file_file_ext | $file_uncompress_cmd | tar -xC $PAYLOAD_DIR/recovery > /dev/null 2>&1
+}
+
+function payload_extract()
+{
+    mkdir -p $PAYLOAD_DIR
+
+    eval $(grep -a -m 1 -A 1 BOOT_IMAGE_OFFSETS $zImage | tail -n 1)
+
+    recovery_extract
+    boot_extract
+}
+
 pre_clean
 unpack_kernel
+payload_extract
 search_cpio
 extract_cpio
 expand_cpio_archive
