@@ -1,8 +1,8 @@
 #!/bin/bash
 ##############################################################################
 # you should point where your cross-compiler is         
-COMPILER=/home/xiaolu/CodeSourcery/arm-2009q3/bin/arm-none-eabi
-COMPILER_LIB=/home/xiaolu/CodeSourcery/arm-2009q3/lib/gcc/arm-none-eabi/4.4.1
+COMPILER=/opt/arm-2010q1/bin/arm-none-linux-gnueabi
+COMPILER_LIB=/opt/arm-2010q1/lib/gcc/arm-none-linux-gnueabi/4.4.1
 #COMPILER=/home/xiaolu/CodeSourcery/Sourcery_G++_Lite/bin/arm-none-eabi
 #COMPILER_LIB=/home/xiaolu/CodeSourcery/Sourcery_G++_Lite/lib/gcc/arm-none-eabi/4.5.2
 ##############################################################################
