@@ -1,32 +1,40 @@
+Ensure you have realpath installed, to install, run 
+	sudo apt-get install realpath
+
 Please edit repack.sh:
-	# you should point where your cross-compiler is         
+	# You should point where your cross-compiler is         
 	COMPILER=/home/xiaolu/bin/android-toolchain-eabi/bin/arm-eabi
 	COMPILER_LIB=/home/xiaolu/bin/android-toolchain-eabi/lib/gcc/arm-eabi/4.5.4
 
-Unpack zImage,Example:
-	./unpack.sh zImagesm21 sm21
+To unpack:
+        $ ./unpack.sh [original_zImage] [unpack_output_dir]
+	
+	Modify files in unpack output dir as necessary.
 
-Repack zImage,Example:
-	./repack.sh zImagesm21 sm21.cpio new_zImage
-	or
-	./repack.sh zImagesm21 sm21 new_zImage
+To repack:
+   a) Generate ramfs output.cpio from unpack output dir:
+        $ ./gen_initramfs.sh -o [output.cpio] -u 0 -g 0 [unpack_output_dir]
 
-Padding sufile to new_zImage offset=7000000,Example:
-	./repack.sh zImagesm21 sm21 new_zImage su
+   b) Repack ramfs output.cpio and kernel from original zImage to new zImage
+        $ ./repack.sh [original_zImage] [output.cpio] [new_zImage]
 
-	how to use sufile:
+Padding su file to new_zImage offset=7000000,Example:
+	./repack.sh [original_zImage] [output.cpio] [new_zImage] su
+
+	How to use su file: 
+	post-int.sh(init.rc services):
 	dd if=/dev/block/mmcblk0p5 of=/system/app/Superuser.apk skip=7026336 seek=0 bs=1 count=196640
 	dd if=/dev/block/mmcblk0p5 of=/system/bin/su skip=7000000 seek=0 bs=1 count=26336
 
 Use tar.xz In the end of the new_zImage:
-	./repack.sh zImagesm21 initramfs new_zImage payload
+	./repack.sh [original_zImage] [output.cpio] [new_zImage] payload
 
-	how to use,pls read initramfs-sample/sbin/script/post-init.sh & recovery.sh
+	Please read initramfs-sample/sbin/script/post-init.sh & recovery.sh for more info on how to use.
 
-	recovery.tar.xz and boot.tar.xz in resources directory，you can customize.
+	You can customise & replace recovery.tar.xz and boot.tar.xz in resources directory.
 
 Custom zImage compression type:
-	./repack.sh zImagesy267 initramfs.cpio new_zImage gzip
+	./repack.sh [original_zImage] [output.cpio] [new_zImage] gzip
 	or
-	./repack.sh zImagesy267 initramfs.cpio new_zImage payload gzip
+	./repack.sh [original_zImage] [output.cpio] [new_zImage] payload gzip
 
