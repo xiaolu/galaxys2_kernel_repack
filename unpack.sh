@@ -335,6 +335,14 @@ function payload_extract()
     mkdir -p $PAYLOAD_DIR
 
     eval $(grep -a -m 1 -A 1 BOOT_IMAGE_OFFSETS $zImage | tail -n 1)
+    if [ -z $recovery_offset ]; then
+        recovery_offset=0
+        recovery_len=0
+    fi
+    if [ -z $boot_offset ]; then
+        boot_offset=0
+        boot_len=0
+    fi
 
     recovery_extract
     boot_extract
